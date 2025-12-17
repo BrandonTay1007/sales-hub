@@ -1,21 +1,18 @@
 import { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, Users, Megaphone, ShoppingCart, Wallet, LogOut, Menu } from 'lucide-react';
+import { LayoutDashboard, Users, Megaphone, ShoppingCart, Wallet, LogOut, Menu, X, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { ThemeToggle } from './ThemeToggle';
+import { NotificationsPopover } from './NotificationsPopover';
 
 const navItems = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, adminOnly: false },
-  { title: 'Users', url: '/users', icon: Users, adminOnly: true },
   { title: 'Campaigns', url: '/campaigns', icon: Megaphone, adminOnly: true },
   { title: 'Orders', url: '/orders', icon: ShoppingCart, adminOnly: true },
+  { title: 'Users', url: '/users', icon: Users, adminOnly: true },
   { title: 'My Payouts', url: '/payouts', icon: Wallet, adminOnly: false },
+  { title: 'Analytics', url: '/analytics', icon: BarChart3, adminOnly: true },
 ];
 
 export const MobileNav = () => {
@@ -24,81 +21,77 @@ export const MobileNav = () => {
   const { user, logout, isAdmin } = useAuth();
 
   const filteredItems = navItems.filter(item => !item.adminOnly || isAdmin);
-  const currentPage = filteredItems.find(item => item.url === location.pathname);
 
   return (
-    <header className="lg:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-sidebar border-b border-sidebar-border">
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <button className="p-2 rounded-md hover:bg-sidebar-accent/50 transition-colors">
-            <Menu className="w-6 h-6 text-sidebar-foreground" />
-          </button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-72 p-0 bg-sidebar border-sidebar-border">
-          <SheetHeader className="p-6 border-b border-sidebar-border">
-            <SheetTitle className="text-xl font-bold text-sidebar-foreground text-left">CommissionPro</SheetTitle>
-            <p className="text-xs text-sidebar-muted text-left">Sales Management</p>
-          </SheetHeader>
-
-          <nav className="flex-1 p-4">
-            <ul className="space-y-1">
-              {filteredItems.map((item) => {
-                const isActive = location.pathname === item.url;
-                return (
-                  <li key={item.url}>
-                    <Link
-                      to={item.url}
-                      onClick={() => setOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                        isActive
-                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                          : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                      }`}
-                    >
-                      <item.icon className="w-5 h-5" />
-                      {item.title}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-
-          <div className="p-4 border-t border-sidebar-border mt-auto">
-            <div className="flex items-center gap-3 px-3 py-2 mb-3">
-              <div className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground text-sm font-medium">
-                {user?.name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name}</p>
-                <p className="text-xs text-sidebar-muted capitalize">{user?.role}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                logout();
-                setOpen(false);
-              }}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
-            >
-              <LogOut className="w-5 h-5" />
-              Logout
-            </button>
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <div className="flex items-center gap-2">
-        {currentPage && (
-          <>
-            <currentPage.icon className="w-5 h-5 text-sidebar-foreground" />
-            <span className="font-medium text-sidebar-foreground">{currentPage.title}</span>
-          </>
-        )}
+    <header className="lg:hidden sticky top-0 z-50 flex items-center justify-between h-14 px-4 border-b border-border bg-card/95 backdrop-blur-sm">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+          <span className="text-primary-foreground font-bold">P</span>
+        </div>
+        <span className="font-semibold text-foreground">Pebble</span>
       </div>
 
-      <div className="w-8 h-8 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground text-sm font-medium">
-        {user?.name.charAt(0)}
+      <div className="flex items-center gap-2">
+        <ThemeToggle />
+        <NotificationsPopover />
+        
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <button className="p-2 rounded-lg hover:bg-secondary transition-colors">
+              <Menu className="w-5 h-5" />
+            </button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-[280px] p-0 bg-sidebar">
+            <div className="flex flex-col h-full">
+              <div className="p-4 border-b border-sidebar-border">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-medium">
+                    {user?.avatar || user?.name?.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-sidebar-foreground">{user?.name}</p>
+                    <p className="text-xs text-sidebar-muted capitalize">{user?.role}</p>
+                  </div>
+                </div>
+              </div>
+
+              <nav className="flex-1 p-4">
+                <ul className="space-y-1">
+                  {filteredItems.map((item) => {
+                    const isActive = location.pathname === item.url ||
+                      (item.url !== '/dashboard' && location.pathname.startsWith(item.url));
+                    return (
+                      <li key={item.url}>
+                        <Link
+                          to={item.url}
+                          onClick={() => setOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                              : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                          }`}
+                        >
+                          <item.icon className="w-5 h-5" />
+                          {item.title}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
+
+              <div className="p-4 border-t border-sidebar-border">
+                <button
+                  onClick={() => { logout(); setOpen(false); }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Logout
+                </button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     </header>
   );
