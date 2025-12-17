@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -11,6 +11,7 @@ import CampaignsPage from "./pages/CampaignsPage";
 import CampaignDetailPage from "./pages/CampaignDetailPage";
 import OrdersPage from "./pages/OrdersPage";
 import PayoutsPage from "./pages/PayoutsPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/payouts" element={<PayoutsPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
