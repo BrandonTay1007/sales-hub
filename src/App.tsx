@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import UsersPage from "./pages/UsersPage";
 import CampaignsPage from "./pages/CampaignsPage";
+import CampaignDetailPage from "./pages/CampaignDetailPage";
 import OrdersPage from "./pages/OrdersPage";
 import PayoutsPage from "./pages/PayoutsPage";
 import NotFound from "./pages/NotFound";
@@ -26,6 +27,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
+            <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/payouts" element={<PayoutsPage />} />
             <Route path="*" element={<NotFound />} />
