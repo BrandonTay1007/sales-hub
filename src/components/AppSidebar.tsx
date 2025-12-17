@@ -17,7 +17,7 @@ export const AppSidebar = () => {
   const filteredItems = navItems.filter(item => !item.adminOnly || isAdmin);
 
   return (
-    <aside className="w-64 min-h-screen bg-sidebar flex flex-col">
+    <aside className="w-64 min-h-screen bg-sidebar flex flex-col sticky top-0 h-screen">
       <div className="p-6 border-b border-sidebar-border">
         <h1 className="text-xl font-bold text-sidebar-foreground">CommissionPro</h1>
         <p className="text-xs text-sidebar-muted mt-1">Sales Management</p>
