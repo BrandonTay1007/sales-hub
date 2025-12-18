@@ -1,7 +1,11 @@
 import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { campaigns, users, orders as initialOrders, Order } from '@/lib/mockData';
-import { Plus, Trash2, Info, Filter, X, ShoppingCart } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Plus, Trash2, Info, Filter, X, ShoppingCart, Eye } from 'lucide-react';
+import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface ProductRow {
   name: string;
@@ -10,18 +14,24 @@ interface ProductRow {
 }
 
 const OrdersPage = () => {
+  const { user, isAdmin } = useAuth();
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
   const [products, setProducts] = useState<ProductRow[]>([{ name: '', qty: 1, basePrice: 0 }]);
   const [showAddOrder, setShowAddOrder] = useState(false);
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
 
   // Filters
   const [filterCampaign, setFilterCampaign] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'week' | 'month'>('all');
 
-  const activeCampaigns = campaigns.filter(c => c.status === 'active');
+  // Get user's campaigns for filtering
+  const userCampaigns = campaigns.filter(c => c.assignedSalesPersonId === user?.id);
+  const availableCampaigns = isAdmin ? campaigns : userCampaigns;
+  const activeCampaigns = availableCampaigns.filter(c => c.status === 'active');
 
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
   const linkedSalesPerson = selectedCampaign 
@@ -32,14 +42,28 @@ const OrdersPage = () => {
   const commissionAmount = linkedSalesPerson ? orderTotal * (linkedSalesPerson.commissionRate / 100) : 0;
 
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    // First filter by user's campaigns if not admin
+    let filtered = isAdmin 
+      ? orders 
+      : orders.filter(o => userCampaigns.some(c => c.id === o.campaignId));
+
+    // Apply quick filters
+    if (quickFilter === 'week') {
+      const weekAgo = new Date('2025-12-10');
+      filtered = filtered.filter(o => new Date(o.createdAt) >= weekAgo);
+    } else if (quickFilter === 'month') {
+      filtered = filtered.filter(o => o.createdAt.startsWith('2025-12'));
+    }
+
+    // Apply other filters
+    return filtered.filter(order => {
       if (filterCampaign && order.campaignId !== filterCampaign) return false;
       if (filterStatus && order.status !== filterStatus) return false;
       if (filterDateFrom && order.createdAt < filterDateFrom) return false;
       if (filterDateTo && order.createdAt > filterDateTo) return false;
       return true;
     });
-  }, [orders, filterCampaign, filterStatus, filterDateFrom, filterDateTo]);
+  }, [orders, filterCampaign, filterStatus, filterDateFrom, filterDateTo, quickFilter, isAdmin, userCampaigns]);
 
   const addProductRow = () => {
     setProducts([...products, { name: '', qty: 1, basePrice: 0 }]);
@@ -82,10 +106,36 @@ const OrdersPage = () => {
     setSelectedCampaignId('');
     setProducts([{ name: '', qty: 1, basePrice: 0 }]);
     setShowAddOrder(false);
+    toast.success('Order created successfully!');
   };
 
   const cancelOrder = (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+
+    // Check if user can cancel (admin or owner)
+    const campaign = campaigns.find(c => c.id === order.campaignId);
+    const canCancel = isAdmin || campaign?.assignedSalesPersonId === user?.id;
+    
+    if (!canCancel) {
+      toast.error('You can only cancel your own orders');
+      return;
+    }
+
     setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'cancelled' as const } : o));
+    
+    // Show undo toast
+    toast.success('Order cancelled', {
+      description: 'Commission has been deducted from totals',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'active' as const } : o));
+          toast.success('Order restored');
+        },
+      },
+      duration: 8000,
+    });
   };
 
   const clearFilters = () => {
@@ -93,17 +143,22 @@ const OrdersPage = () => {
     setFilterStatus('');
     setFilterDateFrom('');
     setFilterDateTo('');
+    setQuickFilter('all');
   };
 
-  const hasFilters = filterCampaign || filterStatus || filterDateFrom || filterDateTo;
+  const hasFilters = filterCampaign || filterStatus || filterDateFrom || filterDateTo || quickFilter !== 'all';
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Order Management</h1>
-            <p className="text-muted-foreground mt-1">Record and manage sales orders</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              {isAdmin ? 'Order Management' : 'My Orders'}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {isAdmin ? 'Record and manage sales orders' : 'View and manage your sales orders'}
+            </p>
           </div>
           <button onClick={() => setShowAddOrder(true)} className="btn-primary">
             <Plus className="w-4 h-4" />
@@ -122,6 +177,41 @@ const OrdersPage = () => {
               </button>
             )}
           </div>
+          
+          {/* Quick Filter Toggles */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setQuickFilter('all')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                quickFilter === 'all' 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              All Time
+            </button>
+            <button
+              onClick={() => setQuickFilter('week')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                quickFilter === 'week' 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              This Week
+            </button>
+            <button
+              onClick={() => setQuickFilter('month')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                quickFilter === 'month' 
+                  ? 'bg-primary text-primary-foreground' 
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              }`}
+            >
+              This Month
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="form-label">Campaign</label>
@@ -131,7 +221,7 @@ const OrdersPage = () => {
                 className="form-select"
               >
                 <option value="">All Campaigns</option>
-                {campaigns.map(c => (
+                {availableCampaigns.map(c => (
                   <option key={c.id} value={c.id}>{c.title}</option>
                 ))}
               </select>
@@ -194,8 +284,13 @@ const OrdersPage = () => {
                 ) : (
                   filteredOrders.slice().reverse().map((order) => {
                     const campaign = campaigns.find(c => c.id === order.campaignId);
+                    const canCancel = isAdmin || campaign?.assignedSalesPersonId === user?.id;
+                    
                     return (
-                      <tr key={order.id} className={`table-row ${order.status === 'cancelled' ? 'opacity-50' : ''}`}>
+                      <tr 
+                        key={order.id} 
+                        className={`table-row ${order.status === 'cancelled' ? 'opacity-50' : ''}`}
+                      >
                         <td className="table-cell">{order.createdAt}</td>
                         <td className="table-cell font-medium">{campaign?.title}</td>
                         <td className="table-cell">
@@ -207,8 +302,16 @@ const OrdersPage = () => {
                           RM {order.orderTotal.toFixed(2)}
                         </td>
                         <td className="table-cell text-right">
-                          <span className="text-success font-medium">RM {order.commissionAmount.toFixed(2)}</span>
-                          <span className="text-xs text-muted-foreground ml-1">({order.snapshotRate}%)</span>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <span className="text-success font-medium">RM {order.commissionAmount.toFixed(2)}</span>
+                              <span className="text-xs text-muted-foreground ml-1">({order.snapshotRate}%)</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Snapshot Rate: {order.snapshotRate}%</p>
+                              <p className="text-xs text-muted-foreground">Rate locked at order creation</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </td>
                         <td className="table-cell">
                           <span className={order.status === 'active' ? 'badge-active' : 'badge-inactive'}>
@@ -216,14 +319,22 @@ const OrdersPage = () => {
                           </span>
                         </td>
                         <td className="table-cell">
-                          {order.status === 'active' && (
+                          <div className="flex items-center gap-2">
                             <button 
-                              onClick={() => cancelOrder(order.id)}
-                              className="text-destructive hover:text-destructive/80 text-sm font-medium"
+                              onClick={() => setViewingOrder(order)}
+                              className="p-1.5 hover:bg-secondary rounded transition-colors"
                             >
-                              Cancel
+                              <Eye className="w-4 h-4 text-muted-foreground" />
                             </button>
-                          )}
+                            {order.status === 'active' && canCancel && (
+                              <button 
+                                onClick={() => cancelOrder(order.id)}
+                                className="text-destructive hover:text-destructive/80 text-sm font-medium"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -235,9 +346,71 @@ const OrdersPage = () => {
         </div>
 
         <div className="text-sm text-muted-foreground text-center">
-          Showing {filteredOrders.length} of {orders.length} orders
+          Showing {filteredOrders.length} of {isAdmin ? orders.length : orders.filter(o => userCampaigns.some(c => c.id === o.campaignId)).length} orders
         </div>
       </div>
+
+      {/* Order Detail Modal */}
+      <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Order Details</DialogTitle>
+          </DialogHeader>
+          {viewingOrder && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{viewingOrder.createdAt}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <span className={viewingOrder.status === 'active' ? 'badge-active' : 'badge-inactive'}>
+                    {viewingOrder.status}
+                  </span>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Products</p>
+                <div className="space-y-2">
+                  {viewingOrder.products.map((product, index) => (
+                    <div key={index} className="flex justify-between p-2 bg-secondary/30 rounded">
+                      <span>{product.name} × {product.qty}</span>
+                      <span className="font-medium">RM {(product.basePrice * product.qty).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <div className="flex justify-between mb-2">
+                  <span className="text-muted-foreground">Order Total</span>
+                  <span className="font-bold">RM {viewingOrder.orderTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <Tooltip>
+                    <TooltipTrigger className="text-muted-foreground underline decoration-dotted">
+                      Snapshot Rate
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Rate locked at order creation time</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <span className="text-primary font-medium">{viewingOrder.snapshotRate}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Commission</span>
+                  <span className="text-success font-bold">RM {viewingOrder.commissionAmount.toFixed(2)}</span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  RM {viewingOrder.orderTotal.toFixed(2)} × {viewingOrder.snapshotRate}% = RM {viewingOrder.commissionAmount.toFixed(2)}
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Add Order Modal */}
       {showAddOrder && (
@@ -267,6 +440,11 @@ const OrdersPage = () => {
                     <option key={c.id} value={c.id}>{c.title}</option>
                   ))}
                 </select>
+                {!isAdmin && activeCampaigns.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No active campaigns assigned to you
+                  </p>
+                )}
               </div>
 
               {linkedSalesPerson && (
@@ -278,6 +456,9 @@ const OrdersPage = () => {
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Rate: <span className="font-semibold text-primary">{linkedSalesPerson.commissionRate}%</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This rate will be locked as snapshot rate
                     </p>
                   </div>
                 </div>

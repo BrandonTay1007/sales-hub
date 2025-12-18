@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { campaigns as initialCampaigns, users, Campaign, getCampaignRevenue } from '@/lib/mockData';
-import { Plus, X, Facebook, Instagram, Edit2, Trash2, ExternalLink } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Plus, X, Facebook, Instagram, Edit2, ExternalLink, Lock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const CampaignsPage = () => {
   const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -17,6 +20,11 @@ const CampaignsPage = () => {
   });
 
   const salesUsers = users.filter(u => u.role === 'sales');
+
+  // Filter campaigns based on role
+  const displayCampaigns = isAdmin 
+    ? campaigns 
+    : campaigns.filter(c => c.assignedSalesPersonId === user?.id);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,13 +64,21 @@ const CampaignsPage = () => {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Campaign Hub</h1>
-            <p className="text-muted-foreground mt-1">Manage marketing campaigns and track performance</p>
+            <h1 className="text-2xl font-bold text-foreground">
+              {isAdmin ? 'Campaign Hub' : 'My Campaigns'}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {isAdmin 
+                ? 'Manage marketing campaigns and track performance' 
+                : 'View your assigned campaigns and their performance'}
+            </p>
           </div>
-          <button onClick={() => setShowModal(true)} className="btn-primary">
-            <Plus className="w-4 h-4" />
-            Create Campaign
-          </button>
+          {isAdmin && (
+            <button onClick={() => setShowModal(true)} className="btn-primary">
+              <Plus className="w-4 h-4" />
+              Create Campaign
+            </button>
+          )}
         </div>
 
         <div className="dashboard-card overflow-hidden p-0">
@@ -79,59 +95,85 @@ const CampaignsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {campaigns.map((campaign) => {
-                  const salesPerson = users.find(u => u.id === campaign.assignedSalesPersonId);
-                  const revenue = getCampaignRevenue(campaign.id);
-                  return (
-                    <tr 
-                      key={campaign.id} 
-                      className="table-row cursor-pointer hover:bg-secondary/70"
-                      onClick={() => handleRowClick(campaign.id)}
-                    >
-                      <td className="table-cell">
-                        <span className={getStatusBadge(campaign.status)}>
-                          {campaign.status}
-                        </span>
-                      </td>
-                      <td className="table-cell font-medium">{campaign.title}</td>
-                      <td className="table-cell">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                            {salesPerson?.avatar}
+                {displayCampaigns.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="table-cell text-center text-muted-foreground py-8">
+                      {isAdmin ? 'No campaigns found' : 'No campaigns assigned to you yet'}
+                    </td>
+                  </tr>
+                ) : (
+                  displayCampaigns.map((campaign) => {
+                    const salesPerson = users.find(u => u.id === campaign.assignedSalesPersonId);
+                    const revenue = getCampaignRevenue(campaign.id);
+                    const isOwner = campaign.assignedSalesPersonId === user?.id;
+                    
+                    return (
+                      <tr 
+                        key={campaign.id} 
+                        className="table-row cursor-pointer hover:bg-secondary/70"
+                        onClick={() => handleRowClick(campaign.id)}
+                      >
+                        <td className="table-cell">
+                          <span className={getStatusBadge(campaign.status)}>
+                            {campaign.status}
+                          </span>
+                        </td>
+                        <td className="table-cell font-medium">{campaign.title}</td>
+                        <td className="table-cell">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                              {salesPerson?.avatar}
+                            </div>
+                            <span>{salesPerson?.name || '-'}</span>
+                            {isOwner && !isAdmin && (
+                              <span className="text-xs text-primary">(You)</span>
+                            )}
                           </div>
-                          <span>{salesPerson?.name || '-'}</span>
-                        </div>
-                      </td>
-                      <td className="table-cell">
-                        <div className="flex items-center gap-2">
-                          {getPlatformIcon(campaign.platform)}
-                          <span className="capitalize">{campaign.platform}</span>
-                        </div>
-                      </td>
-                      <td className="table-cell text-right font-semibold text-foreground">
-                        RM {revenue.toFixed(2)}
-                      </td>
-                      <td className="table-cell">
-                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                          <button 
-                            className="p-1.5 hover:bg-secondary rounded transition-colors"
-                            onClick={() => handleRowClick(campaign.id)}
-                          >
-                            <Edit2 className="w-4 h-4 text-muted-foreground" />
-                          </button>
-                          <a 
-                            href={campaign.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="p-1.5 hover:bg-secondary rounded transition-colors"
-                          >
-                            <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                          </a>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="table-cell">
+                          <div className="flex items-center gap-2">
+                            {getPlatformIcon(campaign.platform)}
+                            <span className="capitalize">{campaign.platform}</span>
+                          </div>
+                        </td>
+                        <td className="table-cell text-right font-semibold text-foreground">
+                          RM {revenue.toFixed(2)}
+                        </td>
+                        <td className="table-cell">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            {isAdmin ? (
+                              <button 
+                                className="p-1.5 hover:bg-secondary rounded transition-colors"
+                                onClick={() => handleRowClick(campaign.id)}
+                              >
+                                <Edit2 className="w-4 h-4 text-muted-foreground" />
+                              </button>
+                            ) : (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="p-1.5 opacity-50 cursor-not-allowed">
+                                    <Lock className="w-4 h-4 text-muted-foreground" />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Only admins can edit campaigns</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
+                            <a 
+                              href={campaign.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="p-1.5 hover:bg-secondary rounded transition-colors"
+                            >
+                              <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                            </a>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -142,7 +184,7 @@ const CampaignsPage = () => {
         </p>
       </div>
 
-      {showModal && (
+      {showModal && isAdmin && (
         <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-card rounded-lg shadow-xl w-full max-w-md border border-border">
             <div className="flex items-center justify-between p-6 border-b border-border">
