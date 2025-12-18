@@ -1,26 +1,36 @@
 import { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, Users, Megaphone, ShoppingCart, Wallet, LogOut, Menu, X, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Users, Megaphone, ShoppingCart, Wallet, LogOut, Menu, BarChart3, UsersRound } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from './ThemeToggle';
 import { NotificationsPopover } from './NotificationsPopover';
 
-const navItems = [
-  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, adminOnly: false },
-  { title: 'Campaigns', url: '/campaigns', icon: Megaphone, adminOnly: true },
-  { title: 'Orders', url: '/orders', icon: ShoppingCart, adminOnly: true },
-  { title: 'Users', url: '/users', icon: Users, adminOnly: true },
-  { title: 'My Payouts', url: '/payouts', icon: Wallet, adminOnly: false },
-  { title: 'Analytics', url: '/analytics', icon: BarChart3, adminOnly: true },
-];
+const getNavItems = (isAdmin: boolean) => {
+  if (isAdmin) {
+    return [
+      { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
+      { title: 'Campaigns', url: '/campaigns', icon: Megaphone },
+      { title: 'Orders', url: '/orders', icon: ShoppingCart },
+      { title: 'Users', url: '/users', icon: Users },
+      { title: 'Team Payouts', url: '/team-payouts', icon: UsersRound },
+      { title: 'Analytics', url: '/analytics', icon: BarChart3 },
+    ];
+  }
+  return [
+    { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
+    { title: 'My Campaigns', url: '/campaigns', icon: Megaphone },
+    { title: 'My Orders', url: '/orders', icon: ShoppingCart },
+    { title: 'My Payouts', url: '/payouts', icon: Wallet },
+  ];
+};
 
 export const MobileNav = () => {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const { user, logout, isAdmin } = useAuth();
 
-  const filteredItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  const navItems = getNavItems(isAdmin);
 
   return (
     <header className="lg:hidden sticky top-0 z-50 flex items-center justify-between h-14 px-4 border-b border-border bg-card/95 backdrop-blur-sm">
@@ -57,7 +67,7 @@ export const MobileNav = () => {
 
               <nav className="flex-1 p-4">
                 <ul className="space-y-1">
-                  {filteredItems.map((item) => {
+                  {navItems.map((item) => {
                     const isActive = location.pathname === item.url ||
                       (item.url !== '/dashboard' && location.pathname.startsWith(item.url));
                     return (

@@ -11,6 +11,7 @@ import CampaignsPage from "./pages/CampaignsPage";
 import CampaignDetailPage from "./pages/CampaignDetailPage";
 import OrdersPage from "./pages/OrdersPage";
 import PayoutsPage from "./pages/PayoutsPage";
+import TeamPayoutsPage from "./pages/TeamPayoutsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import NotFound from "./pages/NotFound";
 
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/campaigns/:id" element={<CampaignDetailPage />} />
             <Route path="/orders" element={<OrdersPage />} />
             <Route path="/payouts" element={<PayoutsPage />} />
+            <Route path="/team-payouts" element={<TeamPayoutsPage />} />
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

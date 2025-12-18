@@ -1,22 +1,32 @@
 import { useLocation, Link } from 'react-router-dom';
-import { LayoutDashboard, Users, Megaphone, ShoppingCart, Wallet, LogOut, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Users, Megaphone, ShoppingCart, Wallet, LogOut, BarChart3, UsersRound } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 
-const navItems = [
-  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard, adminOnly: false },
-  { title: 'Campaigns', url: '/campaigns', icon: Megaphone, adminOnly: true },
-  { title: 'Orders', url: '/orders', icon: ShoppingCart, adminOnly: true },
-  { title: 'Users', url: '/users', icon: Users, adminOnly: true },
-  { title: 'My Payouts', url: '/payouts', icon: Wallet, adminOnly: false },
-  { title: 'Analytics', url: '/analytics', icon: BarChart3, adminOnly: true },
-];
+const getNavItems = (isAdmin: boolean) => {
+  if (isAdmin) {
+    return [
+      { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
+      { title: 'Campaigns', url: '/campaigns', icon: Megaphone },
+      { title: 'Orders', url: '/orders', icon: ShoppingCart },
+      { title: 'Users', url: '/users', icon: Users },
+      { title: 'Team Payouts', url: '/team-payouts', icon: UsersRound },
+      { title: 'Analytics', url: '/analytics', icon: BarChart3 },
+    ];
+  }
+  return [
+    { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
+    { title: 'My Campaigns', url: '/campaigns', icon: Megaphone },
+    { title: 'My Orders', url: '/orders', icon: ShoppingCart },
+    { title: 'My Payouts', url: '/payouts', icon: Wallet },
+  ];
+};
 
 export const AppSidebar = () => {
   const location = useLocation();
   const { user, logout, isAdmin } = useAuth();
 
-  const filteredItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  const navItems = getNavItems(isAdmin);
 
   return (
     <aside className="w-64 min-h-screen bg-sidebar flex flex-col sticky top-0 h-screen">
@@ -34,7 +44,7 @@ export const AppSidebar = () => {
 
       <nav className="flex-1 p-4">
         <ul className="space-y-1">
-          {filteredItems.map((item) => {
+          {navItems.map((item) => {
             const isActive = location.pathname === item.url || 
               (item.url !== '/dashboard' && location.pathname.startsWith(item.url));
             return (
