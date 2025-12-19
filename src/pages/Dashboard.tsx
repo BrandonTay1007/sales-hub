@@ -1,7 +1,7 @@
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { users, campaigns, orders, getDailySales, getPlatformRevenue, getRecentActivity, getTopPerformer } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
-import { DollarSign, TrendingUp, Megaphone, Trophy, ArrowUpRight, ArrowDownRight, Flame, Target, ShoppingCart, Wallet } from 'lucide-react';
+import { DollarSign, TrendingUp, Megaphone, Trophy, ArrowUpRight, ArrowDownRight, Target, ShoppingCart, Wallet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -47,22 +47,6 @@ const Dashboard = () => {
   const userOrderCount = userCurrentMonthOrders.length;
   const userAvgOrderValue = userOrderCount > 0 ? userTotalSales / userOrderCount : 0;
 
-  // Calculate performance streak (consecutive days with sales)
-  const calculateStreak = () => {
-    const dates = [...new Set(userOrders.map(o => o.createdAt))].sort().reverse();
-    let streak = 0;
-    const today = new Date('2025-12-17');
-    for (let i = 0; i < dates.length; i++) {
-      const orderDate = new Date(dates[i]);
-      const diffDays = Math.floor((today.getTime() - orderDate.getTime()) / (1000 * 60 * 60 * 24));
-      if (diffDays === streak || diffDays === streak + 1) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-    return streak;
-  };
 
   // User-specific chart data
   const getUserDailySales = () => {
@@ -124,7 +108,7 @@ const Dashboard = () => {
       });
   };
 
-  const performanceStreak = calculateStreak();
+  
   const dailySales = isAdmin ? getDailySales(7) : getUserDailySales();
   const platformRevenue = isAdmin ? getPlatformRevenue() : getUserPlatformRevenue();
   const recentActivity = isAdmin ? getRecentActivity(5) : getUserRecentActivity();
@@ -232,41 +216,24 @@ const Dashboard = () => {
           ) : (
             <div className="stat-card">
               <div className="flex items-center justify-between">
-                <UITooltip>
-                  <TooltipTrigger>
-                    <span className="text-sm text-muted-foreground">Performance Streak</span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Consecutive days with sales</p>
-                  </TooltipContent>
-                </UITooltip>
-                <Flame className="w-5 h-5 text-orange-500" />
-              </div>
-              <p className="text-2xl font-bold text-foreground">{performanceStreak} days</p>
-              <p className="text-xs text-muted-foreground mt-1">Keep it going! 🔥</p>
-            </div>
-          )}
-        </div>
-
-        {/* Second row of stats for sales person */}
-        {!isAdmin && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="stat-card">
-              <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Orders This Month</span>
                 <ShoppingCart className="w-5 h-5 text-primary" />
               </div>
               <p className="text-2xl font-bold text-foreground">{userOrderCount}</p>
               <p className="text-xs text-muted-foreground mt-1">Total orders placed</p>
             </div>
-            <div className="stat-card">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Avg Order Value</span>
-                <Target className="w-5 h-5 text-accent" />
-              </div>
-              <p className="text-2xl font-bold text-foreground">RM {userAvgOrderValue.toFixed(2)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Per order average</p>
+          )}
+        </div>
+
+        {/* Second row of stats for sales person */}
+        {!isAdmin && (
+          <div className="stat-card max-w-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Avg Order Value</span>
+              <Target className="w-5 h-5 text-accent" />
             </div>
+            <p className="text-2xl font-bold text-foreground">RM {userAvgOrderValue.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Per order average</p>
           </div>
         )}
 
