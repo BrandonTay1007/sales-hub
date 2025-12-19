@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { getLeaderboard, getRevenueByType, getTopProducts, getTopCampaigns, getCumulativeRevenue } from '@/lib/mockData';
-import { Trophy, TrendingUp, Package, Target } from 'lucide-react';
+import { Trophy, TrendingUp, Package, Target, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LineChart, Line, Tooltip, Cell } from 'recharts';
 import { motion } from 'framer-motion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const AnalyticsPage = () => {
   const leaderboard = getLeaderboard();
@@ -10,9 +12,13 @@ const AnalyticsPage = () => {
   const topProducts = getTopProducts();
   const topCampaigns = getTopCampaigns(5);
   const cumulativeRevenue = getCumulativeRevenue();
+  const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
 
   const currentMonthRevenue = cumulativeRevenue[11]?.revenue || 0;
   const projectedNextMonth = Math.round(currentMonthRevenue * 1.15 * 100) / 100;
+
+  // Show only top 5 in main view
+  const displayLeaderboard = leaderboard.slice(0, 5);
 
   return (
     <DashboardLayout>
@@ -43,12 +49,22 @@ const AnalyticsPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Leaderboard */}
           <div className="dashboard-card">
-            <div className="flex items-center gap-2 mb-4">
-              <Trophy className="w-5 h-5 text-warning" />
-              <h2 className="text-lg font-semibold text-foreground">Sales Leaderboard</h2>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-warning" />
+                <h2 className="text-lg font-semibold text-foreground">Sales Leaderboard</h2>
+              </div>
+              {leaderboard.length > 5 && (
+                <button 
+                  onClick={() => setShowFullLeaderboard(true)}
+                  className="text-sm text-primary hover:underline flex items-center gap-1"
+                >
+                  See More <ChevronRight className="w-4 h-4" />
+                </button>
+              )}
             </div>
             <div className="space-y-3">
-              {leaderboard.map((person, index) => (
+              {displayLeaderboard.map((person, index) => (
                 <div key={person.id} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                     index === 0 ? 'bg-warning text-warning-foreground' :
@@ -133,6 +149,48 @@ const AnalyticsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Full Leaderboard Modal */}
+      <Dialog open={showFullLeaderboard} onOpenChange={setShowFullLeaderboard}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-warning" />
+              Full Sales Leaderboard
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {leaderboard.map((person, index) => (
+              <div key={person.id} className="flex items-center gap-4 p-4 rounded-lg bg-secondary/30">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+                  index === 0 ? 'bg-warning text-warning-foreground' :
+                  index === 1 ? 'bg-muted text-muted-foreground' :
+                  index === 2 ? 'bg-orange-600 text-white' : 'bg-secondary text-secondary-foreground'
+                }`}>
+                  {index + 1}
+                </div>
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                  {person.avatar}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-foreground">{person.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {person.orderCount} orders • {person.commissionRate}% rate
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-foreground">RM {person.totalRevenue.toLocaleString()}</p>
+                  <p className="text-sm text-success">+RM {person.totalCommission.toFixed(2)} commission</p>
+                </div>
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm text-muted-foreground">Avg Order</p>
+                  <p className="font-medium text-foreground">RM {person.avgOrderValue.toFixed(2)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };

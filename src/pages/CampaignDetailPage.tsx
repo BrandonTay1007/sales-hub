@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { campaigns, users, orders as allOrders, Order, getCampaignRevenue, getCampaignCommission } from '@/lib/mockData';
-import { ArrowLeft, ExternalLink, Settings, Facebook, Instagram, Plus, Trash2, X, Info } from 'lucide-react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { campaigns as initialCampaigns, users, orders as allOrders, Order, getCampaignRevenue, Campaign } from '@/lib/mockData';
+import { ArrowLeft, ExternalLink, Settings, Facebook, Instagram, Plus, Trash2, X, Info, StopCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 
 interface ProductRow {
   name: string;
@@ -15,16 +16,22 @@ interface ProductRow {
 const CampaignDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const campaign = campaigns.find(c => c.id === id);
+  const [campaignsState, setCampaignsState] = useState<Campaign[]>(initialCampaigns);
+  const campaign = campaignsState.find(c => c.id === id);
   const salesPerson = campaign ? users.find(u => u.id === campaign.assignedSalesPersonId) : null;
   
   const [orders, setOrders] = useState<Order[]>(allOrders);
   const [showAddOrder, setShowAddOrder] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [products, setProducts] = useState<ProductRow[]>([{ name: '', qty: 1, basePrice: 0 }]);
   
   const [editForm, setEditForm] = useState({
     title: campaign?.title || '',
     url: campaign?.url || '',
+    platform: campaign?.platform || 'facebook',
+    type: campaign?.type || 'post',
+    startDate: campaign?.startDate || '',
+    endDate: campaign?.endDate || '',
   });
 
   if (!campaign) {
@@ -81,10 +88,40 @@ const CampaignDetailPage = () => {
     setOrders([...orders, newOrder]);
     setShowAddOrder(false);
     setProducts([{ name: '', qty: 1, basePrice: 0 }]);
+    toast.success('Order added successfully!');
   };
 
   const cancelOrder = (orderId: string) => {
     setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'cancelled' as const } : o));
+    toast.success('Order cancelled');
+  };
+
+  const handleSaveSettings = () => {
+    setCampaignsState(campaignsState.map(c => 
+      c.id === campaign.id 
+        ? { 
+            ...c, 
+            title: editForm.title, 
+            url: editForm.url,
+            platform: editForm.platform as 'facebook' | 'instagram',
+            type: editForm.type as 'post' | 'live' | 'event',
+            startDate: editForm.startDate || undefined,
+            endDate: editForm.endDate || undefined,
+          } 
+        : c
+    ));
+    setShowSettings(false);
+    toast.success('Campaign updated!');
+  };
+
+  const handleEndCampaign = () => {
+    setCampaignsState(campaignsState.map(c => 
+      c.id === campaign.id 
+        ? { ...c, status: 'completed' as const, endDate: new Date().toISOString().split('T')[0] } 
+        : c
+    ));
+    setShowSettings(false);
+    toast.success('Campaign ended!');
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -121,40 +158,10 @@ const CampaignDetailPage = () => {
           </div>
           
           <div className="flex items-center gap-3">
-            <Sheet>
-              <SheetTrigger asChild>
-                <button className="btn-secondary">
-                  <Settings className="w-4 h-4" />
-                  Settings
-                </button>
-              </SheetTrigger>
-              <SheetContent className="bg-card">
-                <SheetHeader>
-                  <SheetTitle>Edit Campaign</SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-4">
-                  <div>
-                    <label className="form-label">Title</label>
-                    <input
-                      type="text"
-                      value={editForm.title}
-                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                      className="form-input"
-                    />
-                  </div>
-                  <div>
-                    <label className="form-label">URL</label>
-                    <input
-                      type="url"
-                      value={editForm.url}
-                      onChange={(e) => setEditForm({ ...editForm, url: e.target.value })}
-                      className="form-input"
-                    />
-                  </div>
-                  <button className="btn-primary w-full">Save Changes</button>
-                </div>
-              </SheetContent>
-            </Sheet>
+            <button onClick={() => setShowSettings(true)} className="btn-secondary">
+              <Settings className="w-4 h-4" />
+              Settings
+            </button>
           </div>
         </div>
 
@@ -284,6 +291,99 @@ const CampaignDetailPage = () => {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Settings Modal (Centered Dialog) */}
+        <Dialog open={showSettings} onOpenChange={setShowSettings}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Campaign</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="form-label">Title</label>
+                <input
+                  type="text"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Platform</label>
+                  <select
+                    value={editForm.platform}
+                    onChange={(e) => setEditForm({ ...editForm, platform: e.target.value as 'facebook' | 'instagram' })}
+                    className="form-select"
+                  >
+                    <option value="facebook">Facebook</option>
+                    <option value="instagram">Instagram</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Type</label>
+                  <select
+                    value={editForm.type}
+                    onChange={(e) => setEditForm({ ...editForm, type: e.target.value as 'post' | 'live' | 'event' })}
+                    className="form-select"
+                  >
+                    <option value="post">Post</option>
+                    <option value="live">Live</option>
+                    <option value="event">Event</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="form-label">URL</label>
+                <input
+                  type="url"
+                  value={editForm.url}
+                  onChange={(e) => setEditForm({ ...editForm, url: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Start Date</label>
+                  <input
+                    type="date"
+                    value={editForm.startDate}
+                    onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+                <div>
+                  <label className="form-label">End Date</label>
+                  <input
+                    type="date"
+                    value={editForm.endDate}
+                    onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+              
+              {campaign.status === 'active' && (
+                <button 
+                  onClick={handleEndCampaign}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                >
+                  <StopCircle className="w-4 h-4" />
+                  End Campaign Now
+                </button>
+              )}
+              
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowSettings(false)} className="btn-secondary flex-1">
+                  Cancel
+                </button>
+                <button onClick={handleSaveSettings} className="btn-primary flex-1">
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Add Order Modal */}
         {showAddOrder && (

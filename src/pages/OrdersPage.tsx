@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { campaigns, users, orders as initialOrders, Order } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Trash2, Info, Filter, X, ShoppingCart, Eye } from 'lucide-react';
+import { Plus, Trash2, Info, Filter, X, ShoppingCart, ArrowUpDown, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,6 +13,8 @@ interface ProductRow {
   basePrice: number;
 }
 
+type SortOption = 'latest' | 'oldest' | 'highest' | 'lowest';
+
 const OrdersPage = () => {
   const { user, isAdmin } = useAuth();
   const [orders, setOrders] = useState<Order[]>(initialOrders);
@@ -20,6 +22,9 @@ const OrdersPage = () => {
   const [products, setProducts] = useState<ProductRow[]>([{ name: '', qty: 1, basePrice: 0 }]);
   const [showAddOrder, setShowAddOrder] = useState(false);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editProducts, setEditProducts] = useState<ProductRow[]>([]);
+  const [sortBy, setSortBy] = useState<SortOption>('latest');
 
   // Filters
   const [filterCampaign, setFilterCampaign] = useState('');
@@ -56,14 +61,30 @@ const OrdersPage = () => {
     }
 
     // Apply other filters
-    return filtered.filter(order => {
+    filtered = filtered.filter(order => {
       if (filterCampaign && order.campaignId !== filterCampaign) return false;
       if (filterStatus && order.status !== filterStatus) return false;
       if (filterDateFrom && order.createdAt < filterDateFrom) return false;
       if (filterDateTo && order.createdAt > filterDateTo) return false;
       return true;
     });
-  }, [orders, filterCampaign, filterStatus, filterDateFrom, filterDateTo, quickFilter, isAdmin, userCampaigns]);
+
+    // Apply sorting
+    return filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'latest':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'oldest':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'highest':
+          return b.orderTotal - a.orderTotal;
+        case 'lowest':
+          return a.orderTotal - b.orderTotal;
+        default:
+          return 0;
+      }
+    });
+  }, [orders, filterCampaign, filterStatus, filterDateFrom, filterDateTo, quickFilter, isAdmin, userCampaigns, sortBy]);
 
   const addProductRow = () => {
     setProducts([...products, { name: '', qty: 1, basePrice: 0 }]);
@@ -147,6 +168,55 @@ const OrdersPage = () => {
   };
 
   const hasFilters = filterCampaign || filterStatus || filterDateFrom || filterDateTo || quickFilter !== 'all';
+
+  const handleRowClick = (order: Order) => {
+    setViewingOrder(order);
+    setIsEditMode(false);
+    setEditProducts(order.products.map(p => ({ ...p })));
+  };
+
+  const handleEditOrder = () => {
+    setIsEditMode(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!viewingOrder) return;
+    
+    const newTotal = editProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0);
+    const newCommission = newTotal * (viewingOrder.snapshotRate / 100);
+    
+    setOrders(orders.map(o => 
+      o.id === viewingOrder.id 
+        ? { ...o, products: editProducts.filter(p => p.name && p.qty > 0), orderTotal: newTotal, commissionAmount: newCommission }
+        : o
+    ));
+    
+    setViewingOrder({ ...viewingOrder, products: editProducts, orderTotal: newTotal, commissionAmount: newCommission });
+    setIsEditMode(false);
+    toast.success('Order updated!');
+  };
+
+  const updateEditProduct = (index: number, field: keyof ProductRow, value: string | number) => {
+    const updated = [...editProducts];
+    if (field === 'name') {
+      updated[index].name = value as string;
+    } else if (field === 'qty') {
+      updated[index].qty = Number(value) || 0;
+    } else if (field === 'basePrice') {
+      updated[index].basePrice = Number(value) || 0;
+    }
+    setEditProducts(updated);
+  };
+
+  const addEditProductRow = () => {
+    setEditProducts([...editProducts, { name: '', qty: 1, basePrice: 0 }]);
+  };
+
+  const removeEditProductRow = (index: number) => {
+    if (editProducts.length > 1) {
+      setEditProducts(editProducts.filter((_, i) => i !== index));
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -259,8 +329,26 @@ const OrdersPage = () => {
           </div>
         </div>
 
-        {/* Orders Table */}
+        {/* Sort and Orders Table */}
         <div className="dashboard-card overflow-hidden p-0">
+          <div className="flex items-center justify-between p-4 border-b border-border">
+            <span className="text-sm text-muted-foreground">
+              {filteredOrders.length} orders
+            </span>
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                className="form-select w-auto text-sm py-1"
+              >
+                <option value="latest">Latest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="highest">Highest Value</option>
+                <option value="lowest">Lowest Value</option>
+              </select>
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-secondary/50">
@@ -271,25 +359,24 @@ const OrdersPage = () => {
                   <th className="table-header text-right">Total</th>
                   <th className="table-header text-right">Commission</th>
                   <th className="table-header">Status</th>
-                  <th className="table-header">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="table-cell text-center text-muted-foreground py-8">
+                    <td colSpan={6} className="table-cell text-center text-muted-foreground py-8">
                       No orders found
                     </td>
                   </tr>
                 ) : (
-                  filteredOrders.slice().reverse().map((order) => {
+                  filteredOrders.map((order) => {
                     const campaign = campaigns.find(c => c.id === order.campaignId);
-                    const canCancel = isAdmin || campaign?.assignedSalesPersonId === user?.id;
                     
                     return (
                       <tr 
                         key={order.id} 
-                        className={`table-row ${order.status === 'cancelled' ? 'opacity-50' : ''}`}
+                        className={`table-row cursor-pointer hover:bg-secondary/70 ${order.status === 'cancelled' ? 'opacity-50' : ''}`}
+                        onClick={() => handleRowClick(order)}
                       >
                         <td className="table-cell">{order.createdAt}</td>
                         <td className="table-cell font-medium">{campaign?.title}</td>
@@ -318,24 +405,6 @@ const OrdersPage = () => {
                             {order.status}
                           </span>
                         </td>
-                        <td className="table-cell">
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => setViewingOrder(order)}
-                              className="p-1.5 hover:bg-secondary rounded transition-colors"
-                            >
-                              <Eye className="w-4 h-4 text-muted-foreground" />
-                            </button>
-                            {order.status === 'active' && canCancel && (
-                              <button 
-                                onClick={() => cancelOrder(order.id)}
-                                className="text-destructive hover:text-destructive/80 text-sm font-medium"
-                              >
-                                Cancel
-                              </button>
-                            )}
-                          </div>
-                        </td>
                       </tr>
                     );
                   })
@@ -345,16 +414,26 @@ const OrdersPage = () => {
           </div>
         </div>
 
-        <div className="text-sm text-muted-foreground text-center">
-          Showing {filteredOrders.length} of {isAdmin ? orders.length : orders.filter(o => userCampaigns.some(c => c.id === o.campaignId)).length} orders
-        </div>
+        <p className="text-sm text-muted-foreground text-center">
+          Click on a row to view order details
+        </p>
       </div>
 
       {/* Order Detail Modal */}
-      <Dialog open={!!viewingOrder} onOpenChange={() => setViewingOrder(null)}>
+      <Dialog open={!!viewingOrder} onOpenChange={() => { setViewingOrder(null); setIsEditMode(false); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Order Details</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>Order Details</span>
+              {isAdmin && viewingOrder?.status === 'active' && !isEditMode && (
+                <button 
+                  onClick={handleEditOrder}
+                  className="p-1.5 hover:bg-secondary rounded transition-colors"
+                >
+                  <Edit2 className="w-4 h-4 text-muted-foreground" />
+                </button>
+              )}
+            </DialogTitle>
           </DialogHeader>
           {viewingOrder && (
             <div className="space-y-4">
@@ -373,20 +452,69 @@ const OrdersPage = () => {
               
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Products</p>
-                <div className="space-y-2">
-                  {viewingOrder.products.map((product, index) => (
-                    <div key={index} className="flex justify-between p-2 bg-secondary/30 rounded">
-                      <span>{product.name} × {product.qty}</span>
-                      <span className="font-medium">RM {(product.basePrice * product.qty).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
+                {isEditMode ? (
+                  <div className="space-y-2">
+                    {editProducts.map((product, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={product.name}
+                          onChange={(e) => updateEditProduct(index, 'name', e.target.value)}
+                          className="form-input flex-1 text-sm"
+                          placeholder="Product"
+                        />
+                        <input
+                          type="number"
+                          value={product.qty || ''}
+                          onChange={(e) => updateEditProduct(index, 'qty', e.target.value)}
+                          className="form-input w-14 text-sm"
+                          min="1"
+                        />
+                        <input
+                          type="number"
+                          value={product.basePrice || ''}
+                          onChange={(e) => updateEditProduct(index, 'basePrice', e.target.value)}
+                          className="form-input w-20 text-sm"
+                          step="0.01"
+                        />
+                        <button
+                          onClick={() => removeEditProductRow(index)}
+                          className="p-1 text-muted-foreground hover:text-destructive"
+                          disabled={editProducts.length === 1}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <button 
+                      type="button" 
+                      onClick={addEditProductRow}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      + Add product
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {viewingOrder.products.map((product, index) => (
+                      <div key={index} className="flex justify-between p-2 bg-secondary/30 rounded">
+                        <span>{product.name} × {product.qty}</span>
+                        <span className="font-medium">RM {(product.basePrice * product.qty).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="border-t border-border pt-4">
                 <div className="flex justify-between mb-2">
                   <span className="text-muted-foreground">Order Total</span>
-                  <span className="font-bold">RM {viewingOrder.orderTotal.toFixed(2)}</span>
+                  <span className="font-bold">
+                    RM {isEditMode 
+                      ? editProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0).toFixed(2)
+                      : viewingOrder.orderTotal.toFixed(2)
+                    }
+                  </span>
                 </div>
                 <div className="flex justify-between mb-2">
                   <Tooltip>
@@ -401,12 +529,34 @@ const OrdersPage = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Commission</span>
-                  <span className="text-success font-bold">RM {viewingOrder.commissionAmount.toFixed(2)}</span>
+                  <span className="text-success font-bold">
+                    RM {isEditMode 
+                      ? (editProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0) * (viewingOrder.snapshotRate / 100)).toFixed(2)
+                      : viewingOrder.commissionAmount.toFixed(2)
+                    }
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                  RM {viewingOrder.orderTotal.toFixed(2)} × {viewingOrder.snapshotRate}% = RM {viewingOrder.commissionAmount.toFixed(2)}
-                </p>
               </div>
+
+              {isEditMode ? (
+                <div className="flex gap-3">
+                  <button onClick={() => setIsEditMode(false)} className="btn-secondary flex-1">
+                    Cancel
+                  </button>
+                  <button onClick={handleSaveEdit} className="btn-primary flex-1">
+                    Save Changes
+                  </button>
+                </div>
+              ) : (
+                viewingOrder.status === 'active' && (
+                  <button 
+                    onClick={() => { cancelOrder(viewingOrder.id); setViewingOrder(null); }}
+                    className="w-full text-destructive hover:bg-destructive/10 py-2 rounded-lg transition-colors text-sm font-medium"
+                  >
+                    Cancel Order
+                  </button>
+                )
+              )}
             </div>
           )}
         </DialogContent>
