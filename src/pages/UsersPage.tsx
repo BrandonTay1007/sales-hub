@@ -95,7 +95,9 @@ const UsersPage = () => {
                       </span>
                     </td>
                     <td className="table-cell">
-                      <span className="font-bold text-lg text-primary">{user.commissionRate}%</span>
+                      <span className="font-bold text-lg text-primary">
+                        {user.role === 'admin' ? '-' : `${user.commissionRate}%`}
+                      </span>
                     </td>
                     <td className="table-cell">
                       <span className={user.status === 'active' ? 'badge-active' : 'badge-inactive'}>
@@ -241,17 +243,24 @@ const UsersPage = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="form-label">Commission Rate: {editingUser.commissionRate}%</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={editingUser.commissionRate}
-                    onChange={(e) => setEditingUser({ ...editingUser, commissionRate: Number(e.target.value) })}
-                    className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
-                  />
-                </div>
+                {editingUser.role !== 'admin' && (
+                  <div>
+                    <label className="form-label">Commission Rate: {editingUser.commissionRate}%</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={editingUser.commissionRate}
+                      onChange={(e) => setEditingUser({ ...editingUser, commissionRate: Number(e.target.value) })}
+                      className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
+                    />
+                  </div>
+                )}
+                {editingUser.role === 'admin' && (
+                  <div className="p-3 rounded-lg bg-secondary/50">
+                    <p className="text-sm text-muted-foreground">Admins don't have commission rates</p>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between py-3 border-y border-border">
                   <div>

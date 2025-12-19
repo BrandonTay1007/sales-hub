@@ -21,6 +21,8 @@ export interface Campaign {
   assignedSalesPersonId: string;
   status: 'active' | 'paused' | 'completed';
   createdAt: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface Order {
@@ -131,18 +133,18 @@ export const users: User[] = [
 
 // 12 Campaigns
 export const campaigns: Campaign[] = [
-  { id: '1', title: 'Summer Sale 2025', platform: 'facebook', type: 'live', url: 'https://fb.com/live/summer', assignedSalesPersonId: '2', status: 'active', createdAt: '2025-11-01' },
-  { id: '2', title: 'New Product Launch', platform: 'instagram', type: 'post', url: 'https://instagram.com/p/launch', assignedSalesPersonId: '3', status: 'active', createdAt: '2025-11-15' },
-  { id: '3', title: 'Flash Friday Deals', platform: 'facebook', type: 'post', url: 'https://fb.com/flash', assignedSalesPersonId: '2', status: 'active', createdAt: '2025-11-20' },
-  { id: '4', title: 'Holiday Special Live', platform: 'instagram', type: 'live', url: 'https://instagram.com/live/holiday', assignedSalesPersonId: '3', status: 'active', createdAt: '2025-12-01' },
-  { id: '5', title: 'Clearance Event', platform: 'facebook', type: 'event', url: 'https://fb.com/clearance', assignedSalesPersonId: '4', status: 'active', createdAt: '2025-10-15' },
-  { id: '6', title: 'Weekend Mega Sale', platform: 'instagram', type: 'live', url: 'https://instagram.com/live/mega', assignedSalesPersonId: '5', status: 'completed', createdAt: '2025-09-01' },
-  { id: '7', title: 'Back to School', platform: 'facebook', type: 'post', url: 'https://fb.com/school', assignedSalesPersonId: '4', status: 'completed', createdAt: '2025-08-15' },
-  { id: '8', title: 'Valentine Collection', platform: 'instagram', type: 'live', url: 'https://instagram.com/live/valentine', assignedSalesPersonId: '5', status: 'completed', createdAt: '2025-02-01' },
-  { id: '9', title: 'Spring Fashion Week', platform: 'facebook', type: 'event', url: 'https://fb.com/spring', assignedSalesPersonId: '2', status: 'active', createdAt: '2025-03-15' },
-  { id: '10', title: 'Tech Gadgets Showcase', platform: 'instagram', type: 'post', url: 'https://instagram.com/p/tech', assignedSalesPersonId: '3', status: 'active', createdAt: '2025-12-05' },
-  { id: '11', title: 'Beauty Box Unboxing', platform: 'facebook', type: 'live', url: 'https://fb.com/live/beauty', assignedSalesPersonId: '4', status: 'active', createdAt: '2025-12-10' },
-  { id: '12', title: 'Year End Blowout', platform: 'instagram', type: 'event', url: 'https://instagram.com/yearend', assignedSalesPersonId: '5', status: 'active', createdAt: '2025-12-12' },
+  { id: '1', title: 'Summer Sale 2025', platform: 'facebook', type: 'live', url: 'https://fb.com/live/summer', assignedSalesPersonId: '2', status: 'active', createdAt: '2025-11-01', startDate: '2025-11-01', endDate: '2025-12-31' },
+  { id: '2', title: 'New Product Launch', platform: 'instagram', type: 'post', url: 'https://instagram.com/p/launch', assignedSalesPersonId: '3', status: 'active', createdAt: '2025-11-15', startDate: '2025-11-15', endDate: '2025-12-20' },
+  { id: '3', title: 'Flash Friday Deals', platform: 'facebook', type: 'post', url: 'https://fb.com/flash', assignedSalesPersonId: '2', status: 'active', createdAt: '2025-11-20', startDate: '2025-11-20' },
+  { id: '4', title: 'Holiday Special Live', platform: 'instagram', type: 'live', url: 'https://instagram.com/live/holiday', assignedSalesPersonId: '3', status: 'active', createdAt: '2025-12-01', startDate: '2025-12-01', endDate: '2025-12-25' },
+  { id: '5', title: 'Clearance Event', platform: 'facebook', type: 'event', url: 'https://fb.com/clearance', assignedSalesPersonId: '4', status: 'active', createdAt: '2025-10-15', startDate: '2025-10-15', endDate: '2025-12-31' },
+  { id: '6', title: 'Weekend Mega Sale', platform: 'instagram', type: 'live', url: 'https://instagram.com/live/mega', assignedSalesPersonId: '5', status: 'completed', createdAt: '2025-09-01', startDate: '2025-09-01', endDate: '2025-09-30' },
+  { id: '7', title: 'Back to School', platform: 'facebook', type: 'post', url: 'https://fb.com/school', assignedSalesPersonId: '4', status: 'completed', createdAt: '2025-08-15', startDate: '2025-08-15', endDate: '2025-09-15' },
+  { id: '8', title: 'Valentine Collection', platform: 'instagram', type: 'live', url: 'https://instagram.com/live/valentine', assignedSalesPersonId: '5', status: 'completed', createdAt: '2025-02-01', startDate: '2025-02-01', endDate: '2025-02-28' },
+  { id: '9', title: 'Spring Fashion Week', platform: 'facebook', type: 'event', url: 'https://fb.com/spring', assignedSalesPersonId: '2', status: 'active', createdAt: '2025-03-15', startDate: '2025-03-15' },
+  { id: '10', title: 'Tech Gadgets Showcase', platform: 'instagram', type: 'post', url: 'https://instagram.com/p/tech', assignedSalesPersonId: '3', status: 'active', createdAt: '2025-12-05', startDate: '2025-12-05', endDate: '2025-12-31' },
+  { id: '11', title: 'Beauty Box Unboxing', platform: 'facebook', type: 'live', url: 'https://fb.com/live/beauty', assignedSalesPersonId: '4', status: 'active', createdAt: '2025-12-10', startDate: '2025-12-10' },
+  { id: '12', title: 'Year End Blowout', platform: 'instagram', type: 'event', url: 'https://instagram.com/yearend', assignedSalesPersonId: '5', status: 'active', createdAt: '2025-12-12', startDate: '2025-12-12', endDate: '2025-12-31' },
 ];
 
 // Product catalog for realistic order generation
