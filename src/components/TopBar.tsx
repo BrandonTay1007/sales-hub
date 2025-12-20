@@ -1,6 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from './ThemeToggle';
-import { NotificationsPopover } from './NotificationsPopover';
 import { Badge } from '@/components/ui/badge';
 
 export const TopBar = () => {
@@ -9,10 +8,9 @@ export const TopBar = () => {
   return (
     <header className="h-14 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-40 hidden lg:flex items-center justify-end px-6 gap-3">
       <ThemeToggle />
-      <NotificationsPopover />
-      
+
       <div className="h-6 w-px bg-border mx-1" />
-      
+
       <div className="flex items-center gap-3">
         <div className="text-right">
           <p className="text-sm font-medium text-foreground">{user?.name}</p>

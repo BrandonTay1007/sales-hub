@@ -1,0 +1,105 @@
+// Prisma schema for Pebble Sales Hub
+// MongoDB with Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// User model - Admin or Sales Person
+model User {
+  id             String     @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  username       String     @unique
+  passwordHash   String
+  role           Role       @default(sales)
+  commissionRate Float      @default(10) // 0-100, only used for sales role
+  status         UserStatus @default(active)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // Relations
+  campaigns Campaign[]
+
+  @@map("users")
+}
+
+enum Role {
+  admin
+  sales
+}
+
+enum UserStatus {
+  active
+  inactive
+}
+
+// Campaign model - Social media post, live, or event
+model Campaign {
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  platform      Platform
+  type          CampaignType
+  url           String
+  salesPersonId String         @db.ObjectId
+  status        CampaignStatus @default(active)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relations
+  salesPerson User    @relation(fields: [salesPersonId], references: [id])
+  orders      Order[]
+
+  @@map("campaigns")
+}
+
+enum Platform {
+  facebook
+  instagram
+}
+
+enum CampaignType {
+  post
+  live
+  event
+}
+
+enum CampaignStatus {
+  active
+  paused
+  completed
+}
+
+// Order model - Sales order with products and commission
+model Order {
+  id               String      @id @default(auto()) @map("_id") @db.ObjectId
+  campaignId       String      @db.ObjectId
+  products         Product[] // Embedded array of products
+  orderTotal       Float // Calculated: sum of products
+  snapshotRate     Float // Commission rate captured at order creation (IMMUTABLE)
+  commissionAmount Float // Calculated: orderTotal * (snapshotRate / 100)
+  status           OrderStatus @default(active)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  // Relations
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  active
+  cancelled
+}
+
+// Embedded type for products within an order
+type Product {
+  name      String
+  qty       Int
+  basePrice Float
+}

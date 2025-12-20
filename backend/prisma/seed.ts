@@ -1,0 +1,151 @@
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+
+const prisma = new PrismaClient();
+
+async function main() {
+    console.log('🌱 Starting seed...');
+
+    // Clean existing data
+    await prisma.order.deleteMany();
+    await prisma.campaign.deleteMany();
+    await prisma.user.deleteMany();
+
+    console.log('🧹 Cleaned existing data');
+
+    // Hash passwords
+    const hashPassword = async (password: string) => {
+        return bcrypt.hash(password, 10);
+    };
+
+    // Create Admin
+    const admin = await prisma.user.create({
+        data: {
+            name: 'Admin User',
+            username: 'admin',
+            passwordHash: await hashPassword('admin123'),
+            role: 'admin',
+            commissionRate: 0,
+            status: 'active',
+        },
+    });
+    console.log('✅ Created admin:', admin.username);
+
+    // Create Sales Persons
+    const salesPersonsData = [
+        { name: 'Sarah Johnson', username: 'sarah.j', rate: 12 },
+        { name: 'Mike Chen', username: 'mike.c', rate: 10 },
+        { name: 'Emily Wong', username: 'emily.w', rate: 15 },
+        { name: 'David Lee', username: 'david.l', rate: 8 },
+        { name: 'Anna Smith', username: 'anna.s', rate: 11 },
+    ];
+
+    const salesPersons: { id: string; commissionRate: number; username: string }[] = [];
+    for (const sp of salesPersonsData) {
+        const user = await prisma.user.create({
+            data: {
+                name: sp.name,
+                username: sp.username,
+                passwordHash: await hashPassword('password123'),
+                role: 'sales',
+                commissionRate: sp.rate,
+                status: 'active',
+            },
+        });
+        salesPersons.push(user);
+        console.log(`✅ Created sales person: ${user.username} (${sp.rate}%)`);
+    }
+
+    // Create Campaigns
+    const campaignsData = [
+        { title: 'Summer Sale 2025', platform: 'facebook' as const, type: 'post' as const },
+        { title: 'Flash Friday Deals', platform: 'instagram' as const, type: 'live' as const },
+        { title: 'Holiday Special', platform: 'facebook' as const, type: 'event' as const },
+        { title: 'New Year Promo', platform: 'instagram' as const, type: 'post' as const },
+        { title: 'Valentine Collection', platform: 'facebook' as const, type: 'live' as const },
+        { title: 'Spring Clearance', platform: 'instagram' as const, type: 'event' as const },
+        { title: 'Mother Day Gift', platform: 'facebook' as const, type: 'post' as const },
+        { title: 'Weekend Flash Sale', platform: 'instagram' as const, type: 'live' as const },
+    ];
+
+    const campaigns: { id: string; salesPersonId: string; title: string }[] = [];
+    for (let i = 0; i < campaignsData.length; i++) {
+        const salesPerson = salesPersons[i % salesPersons.length];
+        const campaign = await prisma.campaign.create({
+            data: {
+                title: campaignsData[i].title,
+                platform: campaignsData[i].platform,
+                type: campaignsData[i].type,
+                url: `https://www.${campaignsData[i].platform}.com/post/${i + 1}`,
+                salesPersonId: salesPerson.id,
+                status: 'active',
+            },
+        });
+        campaigns.push(campaign);
+        console.log(`✅ Created campaign: ${campaign.title} -> ${salesPerson.username}`);
+    }
+
+    // Create Orders across multiple months
+    const products = [
+        [{ name: 'Premium Widget', qty: 2, basePrice: 150.00 }],
+        [{ name: 'Deluxe Gadget', qty: 1, basePrice: 299.00 }, { name: 'Accessory Pack', qty: 3, basePrice: 49.00 }],
+        [{ name: 'Super Bundle', qty: 1, basePrice: 499.00 }],
+        [{ name: 'Starter Kit', qty: 4, basePrice: 79.00 }],
+        [{ name: 'Pro Package', qty: 1, basePrice: 899.00 }],
+        [{ name: 'Basic Item', qty: 5, basePrice: 29.00 }, { name: 'Add-on', qty: 2, basePrice: 19.00 }],
+    ];
+
+    // Create orders for the past 3 months
+    const now = new Date();
+    let orderCount = 0;
+
+    for (let monthOffset = 0; monthOffset < 3; monthOffset++) {
+        const orderDate = new Date(now.getFullYear(), now.getMonth() - monthOffset, 15);
+
+        for (const campaign of campaigns) {
+            // 2-4 orders per campaign per month
+            const numOrders = 2 + Math.floor(Math.random() * 3);
+
+            for (let i = 0; i < numOrders; i++) {
+                const productSet = products[Math.floor(Math.random() * products.length)];
+                const orderTotal = productSet.reduce((sum, p) => sum + (p.qty * p.basePrice), 0);
+
+                // Get the sales person's commission rate at time of order
+                const salesPerson = salesPersons.find(sp =>
+                    campaigns.find(c => c.id === campaign.id)?.salesPersonId === sp.id
+                );
+                const snapshotRate = salesPerson?.commissionRate || 10;
+                const commissionAmount = orderTotal * (snapshotRate / 100);
+
+                await prisma.order.create({
+                    data: {
+                        campaignId: campaign.id,
+                        products: productSet,
+                        orderTotal,
+                        snapshotRate,
+                        commissionAmount,
+                        status: 'active',
+                        createdAt: new Date(orderDate.getTime() + i * 86400000), // Different days
+                    },
+                });
+                orderCount++;
+            }
+        }
+    }
+
+    console.log(`✅ Created ${orderCount} orders across 3 months`);
+
+    console.log('\n🎉 Seed completed successfully!');
+    console.log('\n📋 Login credentials:');
+    console.log('  Admin: username=admin, password=admin123');
+    console.log('  Sales: username=sarah.j (or others), password=password123');
+}
+
+main()
+    .catch((e) => {
+        console.error('❌ Seed failed:', e);
+        process.exit(1);
+    })
+    .finally(async () => {
+        await prisma.$disconnect();
+    });

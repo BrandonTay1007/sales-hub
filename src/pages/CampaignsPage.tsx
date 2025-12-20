@@ -1,108 +1,161 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { campaigns as initialCampaigns, users, Campaign, getCampaignRevenue } from '@/lib/mockData';
+import { campaigns as initialCampaigns, users, Campaign, getCampaignRevenue, orders as initialOrders, Order } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, X, Facebook, Instagram, Edit2, ExternalLink, Lock, StopCircle } from 'lucide-react';
+import { Plus, Facebook, Instagram, Edit2, ExternalLink, Lock, Filter, Trash2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { CampaignEditModal, CampaignFormData } from '@/components/CampaignEditModal';
 
 const CampaignsPage = () => {
   const navigate = useNavigate();
   const { user, isAdmin } = useAuth();
   const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
-  const [showModal, setShowModal] = useState(false);
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
-  const [formData, setFormData] = useState({
-    title: '',
-    platform: 'facebook' as 'facebook' | 'instagram',
-    type: 'post' as 'post' | 'live' | 'event',
-    url: '',
-    assignedSalesPersonId: '',
-    startDate: '',
-    endDate: '',
-  });
+
+  // Filter State
+  const [filterSalesPerson, setFilterSalesPerson] = useState('');
+  const [filterPlatform, setFilterPlatform] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'week' | 'month'>('all');
 
   const salesUsers = users.filter(u => u.role === 'sales');
 
-  // Filter campaigns based on role
-  const displayCampaigns = isAdmin 
-    ? campaigns 
+  // Available campaigns based on role (for filtering logic)
+  const availableCampaigns = isAdmin
+    ? campaigns
     : campaigns.filter(c => c.assignedSalesPersonId === user?.id);
 
-  const resetForm = () => {
-    setFormData({ title: '', platform: 'facebook', type: 'post', url: '', assignedSalesPersonId: '', startDate: '', endDate: '' });
+  const filteredCampaigns = useMemo(() => {
+    let filtered = availableCampaigns;
+
+    // Quick Filters
+    if (quickFilter === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      const weekAgoStr = weekAgo.toISOString().split('T')[0];
+      filtered = filtered.filter(c => (c.startDate || c.createdAt) >= weekAgoStr);
+    } else if (quickFilter === 'month') {
+      const monthPrefix = new Date().toISOString().slice(0, 7); // 2025-12
+      filtered = filtered.filter(c => (c.startDate || c.createdAt).startsWith(monthPrefix));
+    }
+
+    // Explicit Filters
+    filtered = filtered.filter(campaign => {
+      if (filterSalesPerson && campaign.assignedSalesPersonId !== filterSalesPerson) return false;
+      if (filterPlatform && campaign.platform !== filterPlatform) return false;
+      if (filterStatus && campaign.status !== filterStatus) return false;
+      if (filterDateFrom && (campaign.startDate || campaign.createdAt) < filterDateFrom) return false;
+      if (filterDateTo && (campaign.startDate || campaign.createdAt) > filterDateTo) return false;
+      return true;
+    });
+
+    return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [availableCampaigns, filterSalesPerson, filterPlatform, filterStatus, filterDateFrom, filterDateTo, quickFilter]);
+
+  const clearFilters = () => {
+    setFilterSalesPerson('');
+    setFilterPlatform('');
+    setFilterStatus('');
+    setFilterDateFrom('');
+    setFilterDateTo('');
+    setQuickFilter('all');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newCampaign: Campaign = {
-      id: String(campaigns.length + 1),
-      title: formData.title,
-      platform: formData.platform,
-      type: formData.type,
-      url: formData.url,
-      assignedSalesPersonId: formData.assignedSalesPersonId,
-      status: 'active',
-      createdAt: new Date().toISOString().split('T')[0],
-      startDate: formData.startDate || new Date().toISOString().split('T')[0],
-      endDate: formData.endDate || undefined,
-    };
-    setCampaigns([...campaigns, newCampaign]);
-    setShowModal(false);
-    resetForm();
-    toast.success('Campaign created successfully!');
+  const hasFilters = filterSalesPerson || filterPlatform || filterStatus || filterDateFrom || filterDateTo || quickFilter !== 'all';
+
+  const handleCreateClick = () => {
+    setEditingCampaign(null);
+    setIsModalOpen(true);
   };
 
   const handleEditClick = (campaign: Campaign, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingCampaign(campaign);
-    setFormData({
-      title: campaign.title,
-      platform: campaign.platform,
-      type: campaign.type,
-      url: campaign.url,
-      assignedSalesPersonId: campaign.assignedSalesPersonId,
-      startDate: campaign.startDate || '',
-      endDate: campaign.endDate || '',
-    });
+    setIsModalOpen(true);
   };
 
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingCampaign) return;
-    
-    setCampaigns(campaigns.map(c => 
-      c.id === editingCampaign.id 
-        ? { 
-            ...c, 
-            title: formData.title,
-            platform: formData.platform,
-            type: formData.type,
-            url: formData.url,
-            assignedSalesPersonId: formData.assignedSalesPersonId,
-            startDate: formData.startDate || undefined,
-            endDate: formData.endDate || undefined,
-          } 
-        : c
-    ));
+  const closeModal = () => {
+    setIsModalOpen(false);
     setEditingCampaign(null);
-    resetForm();
-    toast.success('Campaign updated successfully!');
+  };
+
+  const handleModalSubmit = (data: CampaignFormData) => {
+    if (editingCampaign) {
+      // Update
+      setCampaigns(campaigns.map(c =>
+        c.id === editingCampaign.id
+          ? {
+            ...c,
+            ...data,
+            assignedSalesPersonId: data.assignedSalesPersonId, // Explicitly update this
+            startDate: data.startDate || undefined,
+            endDate: data.endDate || undefined,
+          }
+          : c
+      ));
+      toast.success('Campaign updated successfully!');
+    } else {
+      // Create
+      const newCampaign: Campaign = {
+        id: String(campaigns.length + 1),
+        ...data,
+        status: 'active',
+        createdAt: new Date().toISOString().split('T')[0],
+        startDate: data.startDate || new Date().toISOString().split('T')[0],
+        endDate: data.endDate || undefined,
+      };
+      setCampaigns([...campaigns, newCampaign]);
+      toast.success('Campaign created successfully!');
+    }
+    closeModal();
   };
 
   const handleEndCampaign = () => {
     if (!editingCampaign) return;
-    
-    setCampaigns(campaigns.map(c => 
-      c.id === editingCampaign.id 
-        ? { ...c, status: 'completed' as const, endDate: new Date().toISOString().split('T')[0] } 
+
+    setCampaigns(campaigns.map(c =>
+      c.id === editingCampaign.id
+        ? { ...c, status: 'completed' as const, endDate: new Date().toISOString().split('T')[0] }
         : c
     ));
-    setEditingCampaign(null);
-    resetForm();
     toast.success('Campaign ended successfully!');
+    closeModal();
+  };
+
+  const deleteCampaign = (campaignId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const campaignToDelete = campaigns.find(c => c.id === campaignId);
+    if (!campaignToDelete) return;
+
+    // Find related orders
+    const relatedOrders = orders.filter(o => o.campaignId === campaignId);
+
+    // Remove campaign and related orders
+    setCampaigns(prev => prev.filter(c => c.id !== campaignId));
+    setOrders(prev => prev.filter(o => o.campaignId !== campaignId));
+
+    toast.success('Campaign deleted', {
+      description: `Campaign and ${relatedOrders.length} related orders removed`,
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setCampaigns(prev => [...prev, campaignToDelete].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          ));
+          setOrders(prev => [...prev, ...relatedOrders]);
+          toast.success('Campaign and orders restored');
+        },
+      },
+    });
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -134,20 +187,130 @@ const CampaignsPage = () => {
               {isAdmin ? 'Campaign Hub' : 'My Campaigns'}
             </h1>
             <p className="text-muted-foreground mt-1">
-              {isAdmin 
-                ? 'Manage marketing campaigns and track performance' 
+              {isAdmin
+                ? 'Manage marketing campaigns and track performance'
                 : 'View your assigned campaigns and their performance'}
             </p>
           </div>
           {isAdmin && (
-            <button onClick={() => setShowModal(true)} className="btn-primary">
+            <button onClick={handleCreateClick} className="btn-primary">
               <Plus className="w-4 h-4" />
               Create Campaign
             </button>
           )}
         </div>
 
+        {/* Filters */}
+        <div className="dashboard-card">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <span className="font-medium text-foreground">Filters</span>
+            {hasFilters && (
+              <button onClick={clearFilters} className="text-xs text-primary hover:underline ml-auto">
+                Clear all
+              </button>
+            )}
+          </div>
+
+          {/* Quick Filter Toggles */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setQuickFilter('all')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'all'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+            >
+              All Time
+            </button>
+            <button
+              onClick={() => setQuickFilter('week')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'week'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+            >
+              This Week
+            </button>
+            <button
+              onClick={() => setQuickFilter('month')}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'month'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+            >
+              This Month
+            </button>
+          </div>
+
+          <div className="flex flex-wrap lg:flex-nowrap gap-3">
+            {isAdmin && (
+              <div className="w-full sm:w-auto flex-1 min-w-0">
+                <label className="form-label">Sales Person</label>
+                <select
+                  value={filterSalesPerson}
+                  onChange={(e) => setFilterSalesPerson(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="">All Sales People</option>
+                  {salesUsers.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="w-full sm:w-auto flex-1 min-w-0">
+              <label className="form-label">Platform</label>
+              <select
+                value={filterPlatform}
+                onChange={(e) => setFilterPlatform(e.target.value)}
+                className="form-select"
+              >
+                <option value="">All Platforms</option>
+                <option value="facebook">Facebook</option>
+                <option value="instagram">Instagram</option>
+              </select>
+            </div>
+            <div className="w-full sm:w-auto flex-1 min-w-0">
+              <label className="form-label">Status</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="form-select"
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+            <div className="w-full sm:w-auto flex-1 min-w-0">
+              <label className="form-label">From Date</label>
+              <input
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="form-input"
+              />
+            </div>
+            <div className="w-full sm:w-auto flex-1 min-w-0">
+              <label className="form-label">To Date</label>
+              <input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="form-input"
+              />
+            </div>
+          </div>
+        </div>
+
         <div className="dashboard-card overflow-hidden p-0">
+          <div className="flex items-center justify-between p-4 border-b border-border bg-secondary/20">
+            <span className="text-sm text-muted-foreground">
+              {filteredCampaigns.length} campaigns
+            </span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-secondary/50">
@@ -162,21 +325,24 @@ const CampaignsPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {displayCampaigns.length === 0 ? (
+                {filteredCampaigns.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="table-cell text-center text-muted-foreground py-8">
-                      {isAdmin ? 'No campaigns found' : 'No campaigns assigned to you yet'}
+                      {isAdmin
+                        ? (hasFilters ? 'No campaigns match your filters' : 'No campaigns found')
+                        : (hasFilters ? 'No campaigns match your filters' : 'No campaigns assigned to you yet')
+                      }
                     </td>
                   </tr>
                 ) : (
-                  displayCampaigns.map((campaign) => {
+                  filteredCampaigns.map((campaign) => {
                     const salesPerson = users.find(u => u.id === campaign.assignedSalesPersonId);
                     const revenue = getCampaignRevenue(campaign.id);
                     const isOwner = campaign.assignedSalesPersonId === user?.id;
-                    
+
                     return (
-                      <tr 
-                        key={campaign.id} 
+                      <tr
+                        key={campaign.id}
                         className="table-row cursor-pointer hover:bg-secondary/70"
                         onClick={() => handleRowClick(campaign.id)}
                       >
@@ -217,12 +383,22 @@ const CampaignsPage = () => {
                         <td className="table-cell">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             {isAdmin ? (
-                              <button 
-                                className="p-1.5 hover:bg-secondary rounded transition-colors"
-                                onClick={(e) => handleEditClick(campaign, e)}
-                              >
-                                <Edit2 className="w-4 h-4 text-muted-foreground" />
-                              </button>
+                              <>
+                                <button
+                                  className="p-1.5 hover:bg-secondary rounded transition-colors"
+                                  onClick={(e) => handleEditClick(campaign, e)}
+                                  title="Edit Campaign"
+                                >
+                                  <Edit2 className="w-4 h-4 text-muted-foreground" />
+                                </button>
+                                <button
+                                  className="p-1.5 hover:bg-destructive/10 rounded transition-colors"
+                                  onClick={(e) => deleteCampaign(campaign.id, e)}
+                                  title="Delete Campaign"
+                                >
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </button>
+                              </>
                             ) : (
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -235,9 +411,9 @@ const CampaignsPage = () => {
                                 </TooltipContent>
                               </Tooltip>
                             )}
-                            <a 
-                              href={campaign.url} 
-                              target="_blank" 
+                            <a
+                              href={campaign.url}
+                              target="_blank"
                               rel="noopener noreferrer"
                               className="p-1.5 hover:bg-secondary rounded transition-colors"
                             >
@@ -259,220 +435,14 @@ const CampaignsPage = () => {
         </p>
       </div>
 
-      {/* Create Campaign Modal */}
-      {showModal && isAdmin && (
-        <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-xl w-full max-w-md border border-border">
-            <div className="flex items-center justify-between p-6 border-b border-border">
-              <h2 className="text-lg font-semibold text-foreground">Create Campaign</h2>
-              <button onClick={() => setShowModal(false)} className="text-muted-foreground hover:text-foreground">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="form-label">Title</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="form-input"
-                  placeholder="Summer Sale 2025"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">Platform</label>
-                  <select
-                    value={formData.platform}
-                    onChange={(e) => setFormData({ ...formData, platform: e.target.value as 'facebook' | 'instagram' })}
-                    className="form-select"
-                  >
-                    <option value="facebook">Facebook</option>
-                    <option value="instagram">Instagram</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Type</label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value as 'post' | 'live' | 'event' })}
-                    className="form-select"
-                  >
-                    <option value="post">Post</option>
-                    <option value="live">Live</option>
-                    <option value="event">Event</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="form-label">URL</label>
-                <input
-                  type="url"
-                  required
-                  value={formData.url}
-                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                  className="form-input"
-                  placeholder="https://..."
-                />
-              </div>
-              <div>
-                <label className="form-label">Assign Sales Person</label>
-                <select
-                  required
-                  value={formData.assignedSalesPersonId}
-                  onChange={(e) => setFormData({ ...formData, assignedSalesPersonId: e.target.value })}
-                  className="form-select"
-                >
-                  <option value="">Select...</option>
-                  {salesUsers.map(user => (
-                    <option key={user.id} value={user.id}>{user.name} ({user.commissionRate}%)</option>
-                  ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">Start Date</label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="form-input"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">End Date (optional)</label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="form-input"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary flex-1">
-                  Create Campaign
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Campaign Modal */}
-      <Dialog open={!!editingCampaign} onOpenChange={() => { setEditingCampaign(null); resetForm(); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Campaign</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleEditSubmit} className="space-y-4">
-            <div>
-              <label className="form-label">Title</label>
-              <input
-                type="text"
-                required
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="form-input"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="form-label">Platform</label>
-                <select
-                  value={formData.platform}
-                  onChange={(e) => setFormData({ ...formData, platform: e.target.value as 'facebook' | 'instagram' })}
-                  className="form-select"
-                >
-                  <option value="facebook">Facebook</option>
-                  <option value="instagram">Instagram</option>
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Type</label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value as 'post' | 'live' | 'event' })}
-                  className="form-select"
-                >
-                  <option value="post">Post</option>
-                  <option value="live">Live</option>
-                  <option value="event">Event</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="form-label">URL</label>
-              <input
-                type="url"
-                required
-                value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-                className="form-input"
-              />
-            </div>
-            <div>
-              <label className="form-label">Assign Sales Person</label>
-              <select
-                required
-                value={formData.assignedSalesPersonId}
-                onChange={(e) => setFormData({ ...formData, assignedSalesPersonId: e.target.value })}
-                className="form-select"
-              >
-                <option value="">Select...</option>
-                {salesUsers.map(user => (
-                  <option key={user.id} value={user.id}>{user.name} ({user.commissionRate}%)</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="form-label">Start Date</label>
-                <input
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="form-input"
-                />
-              </div>
-              <div>
-                <label className="form-label">End Date</label>
-                <input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className="form-input"
-                />
-              </div>
-            </div>
-            
-            {editingCampaign?.status === 'active' && (
-              <button 
-                type="button" 
-                onClick={handleEndCampaign}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
-              >
-                <StopCircle className="w-4 h-4" />
-                End Campaign Now
-              </button>
-            )}
-            
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={() => { setEditingCampaign(null); resetForm(); }} className="btn-secondary flex-1">
-                Cancel
-              </button>
-              <button type="submit" className="btn-primary flex-1">
-                Save Changes
-              </button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <CampaignEditModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        onSubmit={handleModalSubmit}
+        onEndCampaign={handleEndCampaign}
+        campaign={editingCampaign}
+        isCreation={!editingCampaign}
+      />
     </DashboardLayout>
   );
 };

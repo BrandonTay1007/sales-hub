@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { orders, campaigns, users } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate, Link } from 'react-router-dom';
-import { Calendar, Download, MessageSquare, TrendingUp, Target } from 'lucide-react';
+import { Navigate, Link, useNavigate } from 'react-router-dom';
+import { Calendar, Download, MessageSquare, TrendingUp, Target, ChevronDown, ChevronRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 
 const PayoutsPage = () => {
   const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
 
@@ -43,13 +44,13 @@ const PayoutsPage = () => {
 
   // Get user's campaigns
   const userCampaigns = campaigns.filter(c => c.assignedSalesPersonId === user?.id);
-  
+
   // Get user's orders for selected month
   const userMonthOrders = useMemo(() => {
     return orders.filter(order => {
       const orderDate = new Date(order.createdAt);
-      const matchesDate = orderDate.getFullYear() === selectedYear && 
-                         (orderDate.getMonth() + 1) === selectedMonth;
+      const matchesDate = orderDate.getFullYear() === selectedYear &&
+        (orderDate.getMonth() + 1) === selectedMonth;
       const isActive = order.status === 'active';
       const belongsToUser = userCampaigns.some(c => c.id === order.campaignId);
       const matchesCampaign = !filterCampaign || order.campaignId === filterCampaign;
@@ -67,8 +68,8 @@ const PayoutsPage = () => {
       const campaignOrders = userMonthOrders.filter(o => o.campaignId === campaign.id);
       const campaignSales = campaignOrders.reduce((sum, o) => sum + o.orderTotal, 0);
       const campaignCommission = campaignOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
-      const avgRate = campaignOrders.length > 0 
-        ? campaignOrders.reduce((sum, o) => sum + o.snapshotRate, 0) / campaignOrders.length 
+      const avgRate = campaignOrders.length > 0
+        ? campaignOrders.reduce((sum, o) => sum + o.snapshotRate, 0) / campaignOrders.length
         : user?.commissionRate || 0;
       return {
         campaign,
@@ -90,16 +91,16 @@ const PayoutsPage = () => {
         month += 12;
         year -= 1;
       }
-      
+
       const monthOrders = orders.filter(order => {
         const orderDate = new Date(order.createdAt);
-        const matchesDate = orderDate.getFullYear() === year && 
-                           (orderDate.getMonth() + 1) === month;
+        const matchesDate = orderDate.getFullYear() === year &&
+          (orderDate.getMonth() + 1) === month;
         const isActive = order.status === 'active';
         const belongsToUser = userCampaigns.some(c => c.id === order.campaignId);
         return matchesDate && isActive && belongsToUser;
       });
-      
+
       const commission = monthOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
       result.push({
         month: months.find(m => m.value === month)?.short || '',
@@ -258,30 +259,30 @@ const PayoutsPage = () => {
           <div className="h-[150px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={earningsTrend}>
-                <XAxis 
-                  dataKey="month" 
-                  axisLine={false} 
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
                   tickLine={false}
                   tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                 />
-                <YAxis 
-                  axisLine={false} 
+                <YAxis
+                  axisLine={false}
                   tickLine={false}
                   tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                   tickFormatter={(value) => `RM${value}`}
                 />
-                <RechartsTooltip 
+                <RechartsTooltip
                   formatter={(value: number) => [`RM ${value.toFixed(2)}`, 'Commission']}
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
+                  contentStyle={{
+                    backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--border))',
                     borderRadius: '8px'
                   }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="commission" 
-                  stroke="hsl(var(--primary))" 
+                <Line
+                  type="monotone"
+                  dataKey="commission"
+                  stroke="hsl(var(--primary))"
                   strokeWidth={2}
                   dot={{ fill: 'hsl(var(--primary))' }}
                 />
@@ -293,7 +294,7 @@ const PayoutsPage = () => {
         {/* Campaign Breakdown - Flat List */}
         <div className="space-y-4">
           <h3 className="font-semibold text-foreground">Campaign Breakdown</h3>
-          
+
           {campaignBreakdown.length === 0 ? (
             <div className="dashboard-card text-center py-8">
               <p className="text-muted-foreground">No orders found for this period</p>
@@ -301,16 +302,21 @@ const PayoutsPage = () => {
           ) : (
             campaignBreakdown.map((breakdown) => (
               <div key={breakdown.campaign.id} className="dashboard-card">
-                <div 
+                <div
                   className="flex items-center justify-between cursor-pointer"
                   onClick={() => setExpandedCampaign(
                     expandedCampaign === breakdown.campaign.id ? null : breakdown.campaign.id
                   )}
                 >
                   <div>
-                    <h4 className="font-medium text-foreground">{breakdown.campaign.title}</h4>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
+                      className="font-medium text-foreground hover:text-primary hover:underline transition-colors text-left"
+                    >
+                      {breakdown.campaign.title}
+                    </button>
                     <p className="text-sm text-muted-foreground">
-                      {breakdown.orders.length} orders • 
+                      {breakdown.orders.length} orders •
                       <Tooltip>
                         <TooltipTrigger className="ml-1 underline decoration-dotted">
                           Avg Rate: {breakdown.avgRate.toFixed(1)}%
@@ -321,9 +327,16 @@ const PayoutsPage = () => {
                       </Tooltip>
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-success">RM {breakdown.totalCommission.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">from RM {breakdown.totalSales.toFixed(2)}</p>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-success">RM {breakdown.totalCommission.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">from RM {breakdown.totalSales.toFixed(2)}</p>
+                    </div>
+                    {expandedCampaign === breakdown.campaign.id ? (
+                      <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                    )}
                   </div>
                 </div>
 
@@ -336,6 +349,7 @@ const PayoutsPage = () => {
                         <thead>
                           <tr className="border-b border-border">
                             <th className="text-left py-2 text-muted-foreground font-medium">Date</th>
+                            <th className="text-left py-2 text-muted-foreground font-medium">Products</th>
                             <th className="text-right py-2 text-muted-foreground font-medium">Sales</th>
                             <th className="text-right py-2 text-muted-foreground font-medium">
                               <Tooltip>
@@ -350,6 +364,9 @@ const PayoutsPage = () => {
                           {breakdown.orders.map((order) => (
                             <tr key={order.id} className="border-b border-border/50">
                               <td className="py-2">{order.createdAt}</td>
+                              <td className="py-2 text-muted-foreground text-xs">
+                                {order.products.map(p => `${p.name} (${p.qty})`).join(', ')}
+                              </td>
                               <td className="py-2 text-right">RM {order.orderTotal.toFixed(2)}</td>
                               <td className="py-2 text-right text-primary">{order.snapshotRate}%</td>
                               <td className="py-2 text-right font-medium text-success">
@@ -360,7 +377,7 @@ const PayoutsPage = () => {
                         </tbody>
                         <tfoot>
                           <tr className="bg-secondary/30">
-                            <td className="py-2 font-medium" colSpan={2}>
+                            <td className="py-2 font-medium" colSpan={3}>
                               Total: RM {breakdown.totalSales.toFixed(2)} × {breakdown.avgRate.toFixed(1)}%
                             </td>
                             <td className="py-2 text-right font-bold text-success" colSpan={2}>
@@ -369,6 +386,14 @@ const PayoutsPage = () => {
                           </tr>
                         </tfoot>
                       </table>
+                    </div>
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
+                        className="btn-secondary text-sm"
+                      >
+                        See Details
+                      </button>
                     </div>
                   </div>
                 )}

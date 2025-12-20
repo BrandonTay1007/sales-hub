@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { orders, campaigns, users } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Calendar, Download, ChevronDown, ChevronRight, Users as UsersIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -19,6 +19,7 @@ const TeamPayoutsPage = () => {
 };
 
 const AdminTeamPayouts = () => {
+  const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
 
@@ -119,7 +120,7 @@ const AdminTeamPayouts = () => {
         avgRate:
           userOrders.length > 0
             ? userOrders.reduce((sum, o) => sum + o.snapshotRate, 0) /
-              userOrders.length
+            userOrders.length
             : salesUser.commissionRate,
       };
     });
@@ -272,9 +273,8 @@ const AdminTeamPayouts = () => {
                 return (
                   <Fragment key={payout.user.id}>
                     <tr
-                      className={`table-row cursor-pointer hover:bg-secondary/50 ${
-                        isExpanded ? 'bg-secondary/30' : ''
-                      }`}
+                      className={`table-row cursor-pointer hover:bg-secondary/50 ${isExpanded ? 'bg-secondary/30' : ''
+                        }`}
                       onClick={() => toggleExpanded(payout.user.id)}
                     >
                       <td className="table-cell">
@@ -333,10 +333,11 @@ const AdminTeamPayouts = () => {
                                 {payout.campaignBreakdown.map((breakdown) => (
                                   <div
                                     key={breakdown.campaign.id}
-                                    className="bg-background rounded-lg p-3 border border-border"
+                                    className="bg-background rounded-lg p-3 border border-border cursor-pointer hover:bg-secondary/30 transition-colors"
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
                                   >
                                     <div className="flex items-center justify-between mb-2">
-                                      <span className="font-medium text-foreground">
+                                      <span className="font-medium text-foreground hover:text-primary">
                                         {breakdown.campaign.title}
                                       </span>
                                       <span className="text-success font-semibold">

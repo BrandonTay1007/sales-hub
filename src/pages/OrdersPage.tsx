@@ -39,7 +39,7 @@ const OrdersPage = () => {
   const activeCampaigns = availableCampaigns.filter(c => c.status === 'active');
 
   const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
-  const linkedSalesPerson = selectedCampaign 
+  const linkedSalesPerson = selectedCampaign
     ? users.find(u => u.id === selectedCampaign.assignedSalesPersonId)
     : null;
 
@@ -48,8 +48,8 @@ const OrdersPage = () => {
 
   const filteredOrders = useMemo(() => {
     // First filter by user's campaigns if not admin
-    let filtered = isAdmin 
-      ? orders 
+    let filtered = isAdmin
+      ? orders
       : orders.filter(o => userCampaigns.some(c => c.id === o.campaignId));
 
     // Apply quick filters
@@ -112,10 +112,17 @@ const OrdersPage = () => {
     e.preventDefault();
     if (!selectedCampaignId || !linkedSalesPerson) return;
 
+    // Validate at least 1 product
+    const validProducts = products.filter(p => p.name && p.qty > 0);
+    if (validProducts.length === 0) {
+      toast.error('Please add at least one product');
+      return;
+    }
+
     const newOrder: Order = {
       id: String(orders.length + 1),
       campaignId: selectedCampaignId,
-      products: products.filter(p => p.name && p.qty > 0),
+      products: validProducts,
       orderTotal,
       snapshotRate: linkedSalesPerson.commissionRate,
       commissionAmount,
@@ -127,35 +134,40 @@ const OrdersPage = () => {
     setSelectedCampaignId('');
     setProducts([{ name: '', qty: 1, basePrice: 0 }]);
     setShowAddOrder(false);
+    setSortBy('latest'); // Reset to default sort so new order appears at top
     toast.success('Order created successfully!');
   };
 
-  const cancelOrder = (orderId: string) => {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
+  const deleteOrder = (orderId: string) => {
+    const orderToDelete = orders.find(o => o.id === orderId);
+    if (!orderToDelete) return;
 
-    // Check if user can cancel (admin or owner)
-    const campaign = campaigns.find(c => c.id === order.campaignId);
-    const canCancel = isAdmin || campaign?.assignedSalesPersonId === user?.id;
-    
-    if (!canCancel) {
-      toast.error('You can only cancel your own orders');
+    // Check if user can delete (admin or owner) - although UI hides it, safer to check
+    const campaign = campaigns.find(c => c.id === orderToDelete.campaignId);
+    const canDelete = isAdmin || campaign?.assignedSalesPersonId === user?.id;
+
+    if (!canDelete) {
+      toast.error('You can only delete your own orders');
       return;
     }
 
-    setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'cancelled' as const } : o));
-    
+    // Remove order from state
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+
     // Show undo toast
-    toast.success('Order cancelled', {
-      description: 'Commission has been deducted from totals',
+    toast.success('Order deleted', {
+      description: 'Order removed from records',
+      duration: 5000,
       action: {
         label: 'Undo',
         onClick: () => {
-          setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'active' as const } : o));
+          // Restore order in correct sorting position (simplest is just add back)
+          setOrders(prev => [...prev, orderToDelete].sort((a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          ));
           toast.success('Order restored');
         },
       },
-      duration: 8000,
     });
   };
 
@@ -181,17 +193,24 @@ const OrdersPage = () => {
 
   const handleSaveEdit = () => {
     if (!viewingOrder) return;
-    
-    const newTotal = editProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0);
+
+    // Validate at least 1 product
+    const validProducts = editProducts.filter(p => p.name && p.qty > 0);
+    if (validProducts.length === 0) {
+      toast.error('Please add at least one product');
+      return;
+    }
+
+    const newTotal = validProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0);
     const newCommission = newTotal * (viewingOrder.snapshotRate / 100);
-    
-    setOrders(orders.map(o => 
-      o.id === viewingOrder.id 
-        ? { ...o, products: editProducts.filter(p => p.name && p.qty > 0), orderTotal: newTotal, commissionAmount: newCommission }
+
+    setOrders(orders.map(o =>
+      o.id === viewingOrder.id
+        ? { ...o, products: validProducts, orderTotal: newTotal, commissionAmount: newCommission }
         : o
     ));
-    
-    setViewingOrder({ ...viewingOrder, products: editProducts, orderTotal: newTotal, commissionAmount: newCommission });
+
+    setViewingOrder({ ...viewingOrder, products: validProducts, orderTotal: newTotal, commissionAmount: newCommission });
     setIsEditMode(false);
     toast.success('Order updated!');
   };
@@ -230,10 +249,12 @@ const OrdersPage = () => {
               {isAdmin ? 'Record and manage sales orders' : 'View and manage your sales orders'}
             </p>
           </div>
-          <button onClick={() => setShowAddOrder(true)} className="btn-primary">
-            <Plus className="w-4 h-4" />
-            Add Order
-          </button>
+          {isAdmin && (
+            <button onClick={() => setShowAddOrder(true)} className="btn-primary">
+              <Plus className="w-4 h-4" />
+              Add Order
+            </button>
+          )}
         </div>
 
         {/* Filters */}
@@ -247,36 +268,33 @@ const OrdersPage = () => {
               </button>
             )}
           </div>
-          
+
           {/* Quick Filter Toggles */}
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setQuickFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                quickFilter === 'all' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'all'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
             >
               All Time
             </button>
             <button
               onClick={() => setQuickFilter('week')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                quickFilter === 'week' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'week'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
             >
               This Week
             </button>
             <button
               onClick={() => setQuickFilter('month')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                quickFilter === 'month' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'month'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
             >
               This Month
             </button>
@@ -359,22 +377,23 @@ const OrdersPage = () => {
                   <th className="table-header text-right">Total</th>
                   <th className="table-header text-right">Commission</th>
                   <th className="table-header">Status</th>
+                  {isAdmin && <th className="table-header">Actions</th>}
                 </tr>
               </thead>
               <tbody>
                 {filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="table-cell text-center text-muted-foreground py-8">
+                    <td colSpan={isAdmin ? 7 : 6} className="table-cell text-center text-muted-foreground py-8">
                       No orders found
                     </td>
                   </tr>
                 ) : (
                   filteredOrders.map((order) => {
                     const campaign = campaigns.find(c => c.id === order.campaignId);
-                    
+
                     return (
-                      <tr 
-                        key={order.id} 
+                      <tr
+                        key={order.id}
                         className={`table-row cursor-pointer hover:bg-secondary/70 ${order.status === 'cancelled' ? 'opacity-50' : ''}`}
                         onClick={() => handleRowClick(order)}
                       >
@@ -405,6 +424,28 @@ const OrdersPage = () => {
                             {order.status}
                           </span>
                         </td>
+                        {isAdmin && (
+                          <td className="table-cell">
+                            {order.status === 'active' && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setViewingOrder(order); setIsEditMode(true); }}
+                                  className="p-1 hover:bg-secondary rounded transition-colors"
+                                  title="Edit Order"
+                                >
+                                  <Edit2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteOrder(order.id); }}
+                                  className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                                  title="Delete Order"
+                                >
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     );
                   })
@@ -423,17 +464,7 @@ const OrdersPage = () => {
       <Dialog open={!!viewingOrder} onOpenChange={() => { setViewingOrder(null); setIsEditMode(false); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Order Details</span>
-              {isAdmin && viewingOrder?.status === 'active' && !isEditMode && (
-                <button 
-                  onClick={handleEditOrder}
-                  className="p-1.5 hover:bg-secondary rounded transition-colors"
-                >
-                  <Edit2 className="w-4 h-4 text-muted-foreground" />
-                </button>
-              )}
-            </DialogTitle>
+            <DialogTitle>Order Details</DialogTitle>
           </DialogHeader>
           {viewingOrder && (
             <div className="space-y-4">
@@ -449,7 +480,7 @@ const OrdersPage = () => {
                   </span>
                 </div>
               </div>
-              
+
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Products</p>
                 {isEditMode ? (
@@ -486,8 +517,8 @@ const OrdersPage = () => {
                         </button>
                       </div>
                     ))}
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={addEditProductRow}
                       className="text-xs text-primary hover:underline"
                     >
@@ -510,7 +541,7 @@ const OrdersPage = () => {
                 <div className="flex justify-between mb-2">
                   <span className="text-muted-foreground">Order Total</span>
                   <span className="font-bold">
-                    RM {isEditMode 
+                    RM {isEditMode
                       ? editProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0).toFixed(2)
                       : viewingOrder.orderTotal.toFixed(2)
                     }
@@ -530,7 +561,7 @@ const OrdersPage = () => {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Commission</span>
                   <span className="text-success font-bold">
-                    RM {isEditMode 
+                    RM {isEditMode
                       ? (editProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0) * (viewingOrder.snapshotRate / 100)).toFixed(2)
                       : viewingOrder.commissionAmount.toFixed(2)
                     }
@@ -548,12 +579,12 @@ const OrdersPage = () => {
                   </button>
                 </div>
               ) : (
-                viewingOrder.status === 'active' && (
-                  <button 
-                    onClick={() => { cancelOrder(viewingOrder.id); setViewingOrder(null); }}
+                viewingOrder.status === 'active' && isAdmin && (
+                  <button
+                    onClick={() => { deleteOrder(viewingOrder.id); setViewingOrder(null); }}
                     className="w-full text-destructive hover:bg-destructive/10 py-2 rounded-lg transition-colors text-sm font-medium"
                   >
-                    Cancel Order
+                    Delete Order
                   </button>
                 )
               )}
@@ -575,7 +606,7 @@ const OrdersPage = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               <div>
                 <label className="form-label">Select Campaign</label>
@@ -621,7 +652,7 @@ const OrdersPage = () => {
                     <Plus className="w-3 h-3" /> Add Row
                   </button>
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
                   {products.map((product, index) => (
                     <div key={index} className="flex items-center gap-2">
                       <input
