@@ -10,24 +10,24 @@ Total Tasks: 8
 #### Task Group 1: UI Implementation
 **Dependencies:** None
 
-- [ ] 1.0 Complete UI Implementation
-  - [ ] 1.1 Write 2-4 focused tests for Commission Display
+- [x] 1.0 Complete UI Implementation
+  - [x] 1.1 Write 2-4 focused tests for Commission Display
     - Test `getCampaignCommission` calculation logic
     - Test that Commission column renders in the table
     - Test that values are formatted correctly (RM prefix, decimals)
-  - [ ] 1.2 Implement `getCampaignCommission` helper
+  - [x] 1.2 Implement `getCampaignCommission` helper
     - Filter orders by campaignId
     - Sum commissionAmount
-  - [ ] 1.3 Update Campaigns Table Headers
+  - [x] 1.3 Update Campaigns Table Headers
     - Add "Commission" header after Revenue
-  - [ ] 1.4 Update Campaigns Table Body
+  - [x] 1.4 Update Campaigns Table Body
     - Call helper for each row
     - Render new cell with formatting
-  - [ ] 1.5 Update Loading & Empty States
+  - [x] 1.5 Update Loading & Empty States
     - Add Skeleton cell
     - Increase colSpan for empty row
-  - [ ] 1.6 Ensure UI tests pass
-    - Run ONLY the tests written in 1.1 checks
+  - [x] 1.6 Ensure UI tests pass
+    - Run ONLY the tests written in 1.1
     - Verify column appears and values are correct
 
 **Acceptance Criteria:**

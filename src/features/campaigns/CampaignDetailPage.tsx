@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ordersApi, campaignsApi, usersApi, type Campaign, type Order, type Product, getErrorMessage } from '@/lib/api';
@@ -25,6 +25,8 @@ const CampaignDetailPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
+  const [searchParams] = useSearchParams();
+  const initialDateFilter = searchParams.get('date') || '';
 
   const [showAddOrder, setShowAddOrder] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -78,6 +80,32 @@ const CampaignDetailPage = () => {
     orders: campaignOrders,
     isAdmin: true, // We already fetched orders specific to this campaign, so bypass the hook's ownership check
   });
+
+  // Apply URL parameter filters (from PayoutsPage navigation)
+  useEffect(() => {
+    const month = searchParams.get('month');
+    const year = searchParams.get('year');
+
+    // If month/year match current month, use "This month" quick filter
+    if (month && year) {
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      if (parseInt(month) === currentMonth && parseInt(year) === currentYear) {
+        setters.setQuick('month');
+      } else {
+        // For other months, calculate the date range
+        const monthNum = parseInt(month);
+        const yearNum = parseInt(year);
+
+        const startDate = new Date(yearNum, monthNum - 1, 1);
+        const endDate = new Date(yearNum, monthNum, 0);
+
+        setters.setDateFrom(startDate.toISOString().split('T')[0]);
+        setters.setDateTo(endDate.toISOString().split('T')[0]);
+      }
+    }
+  }, [searchParams, setters]);
 
   // Settings form state
   const [editForm, setEditForm] = useState({
@@ -833,6 +861,12 @@ const CampaignDetailPage = () => {
                           min="0"
                           value={product.basePrice || ''}
                           onChange={(e) => updateProduct(index, 'basePrice', e.target.value)}
+                          onBlur={(e) => {
+                            const val = parseFloat(e.target.value);
+                            if (!isNaN(val) && val >= 0) {
+                              updateProduct(index, 'basePrice', val.toFixed(2));
+                            }
+                          }}
                           className="form-input w-20"
                         />
                         <button

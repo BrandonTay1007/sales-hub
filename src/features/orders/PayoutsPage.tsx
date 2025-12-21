@@ -316,7 +316,10 @@ const PayoutsPage = () => {
                 >
                   <div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/campaigns/${breakdown.campaign.id}?month=${selectedMonth}&year=${selectedYear}`);
+                      }}
                       className="font-medium text-foreground hover:text-primary hover:underline transition-colors text-left"
                     >
                       {breakdown.campaign.title}
@@ -420,7 +423,10 @@ const PayoutsPage = () => {
                     )}
                     <div className="mt-4 text-center">
                       <button
-                        onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/campaigns/${breakdown.campaign.id}?month=${selectedMonth}&year=${selectedYear}`);
+                        }}
                         className="btn-secondary text-sm"
                       >
                         See Details

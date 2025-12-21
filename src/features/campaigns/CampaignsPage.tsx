@@ -147,6 +147,13 @@ const CampaignsPage = () => {
       .reduce((sum, o) => sum + o.orderTotal, 0);
   };
 
+  // Calculate campaign commission from orders
+  const getCampaignCommission = (campaignId: string) => {
+    return orders
+      .filter(o => o.campaignId === campaignId)
+      .reduce((sum, o) => sum + o.commissionAmount, 0);
+  };
+
   // Filter logic
   const filteredCampaigns = useMemo(() => {
     // Role-based filtering: sales sees only their campaigns
@@ -470,6 +477,7 @@ const CampaignsPage = () => {
                   <th className="table-header">Status</th>
                   <th className="table-header">Period</th>
                   <th className="table-header text-right">Revenue</th>
+                  <th className="table-header text-right">Commission</th>
                   <th className="table-header">Actions</th>
                 </tr>
               </thead>
@@ -490,12 +498,13 @@ const CampaignsPage = () => {
                       <td className="table-cell"><Skeleton className="h-5 w-14" /></td>
                       <td className="table-cell"><Skeleton className="h-4 w-24" /></td>
                       <td className="table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                      <td className="table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
                       <td className="table-cell"><Skeleton className="h-6 w-16" /></td>
                     </tr>
                   ))
                 ) : filteredCampaigns.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="table-cell text-center text-muted-foreground py-8">
+                    <td colSpan={10} className="table-cell text-center text-muted-foreground py-8">
                       {isAdmin
                         ? (hasFilters ? 'No campaigns match your filters' : 'No campaigns found')
                         : (hasFilters ? 'No campaigns match your filters' : 'No campaigns assigned to you yet')}
@@ -505,6 +514,7 @@ const CampaignsPage = () => {
                   filteredCampaigns.map((campaign) => {
                     const salesPerson = allUsers.find(u => u.id === campaign.salesPersonId) || campaign.salesPerson;
                     const revenue = getCampaignRevenue(campaign.id);
+                    const commission = getCampaignCommission(campaign.id);
                     const isOwner = campaign.salesPersonId === user?.id;
 
                     return (
@@ -548,6 +558,9 @@ const CampaignsPage = () => {
                         </td>
                         <td className="table-cell text-right font-semibold text-foreground">
                           RM {revenue.toFixed(2)}
+                        </td>
+                        <td className="table-cell text-right font-semibold text-green-600 dark:text-green-500">
+                          RM {commission.toFixed(2)}
                         </td>
                         <td className="table-cell">
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>

@@ -197,6 +197,12 @@ export const OrderForm = ({
                                 min="0"
                                 value={product.basePrice || ''}
                                 onChange={(e) => updateProduct(index, 'basePrice', e.target.value)}
+                                onBlur={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    if (!isNaN(val) && val >= 0) {
+                                        updateProduct(index, 'basePrice', val.toFixed(2));
+                                    }
+                                }}
                                 className="form-input w-20"
                             />
                             <button

@@ -132,7 +132,13 @@ export const OrderEditModal = ({
                                         type="number"
                                         value={product.basePrice || ''}
                                         onChange={(e) => updateProduct(index, 'basePrice', e.target.value)}
-                                        className="form-input w-24"
+                                        onBlur={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            if (!isNaN(val) && val >= 0) {
+                                                updateProduct(index, 'basePrice', val.toFixed(2));
+                                            }
+                                        }}
+                                        className="form-input w-20"
                                         placeholder="Price"
                                         step="0.01"
                                         min="0"

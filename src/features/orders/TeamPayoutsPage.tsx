@@ -388,7 +388,10 @@ const AdminTeamPayouts = () => {
                                     <div
                                       key={breakdown.campaign.id}
                                       className="bg-background rounded-lg p-3 border border-border cursor-pointer hover:bg-secondary/30 transition-colors"
-                                      onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/campaigns/${breakdown.campaign.id}?month=${selectedMonth}&year=${selectedYear}`);
+                                      }}
                                     >
                                       <div className="flex items-center justify-between mb-2">
                                         <span className="font-medium text-foreground hover:text-primary flex items-center gap-2">
