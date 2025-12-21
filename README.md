@@ -83,7 +83,7 @@ A web-based platform that automates sales tracking, locks commission rates at th
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/BrandonTay1007/sales-hub
    cd sales-hub
    ```
 
