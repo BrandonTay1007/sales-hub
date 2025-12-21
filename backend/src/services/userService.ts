@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma';
 import { authService } from './authService';
 import { ValidationError, NotFoundError, ConflictError } from '../middleware/errorHandler';
+import { hasMaxTwoDecimals } from '../utils/validation';
 
 // Type definitions matching Prisma schema
 type Role = 'admin' | 'sales';
@@ -85,6 +86,9 @@ export const userService = {
             if (data.commissionRate < 0 || data.commissionRate > 100) {
                 throw new ValidationError('Commission rate must be between 0 and 100');
             }
+            if (!hasMaxTwoDecimals(data.commissionRate)) {
+                throw new ValidationError('Commission rate must have at most 2 decimal places');
+            }
         }
 
         // Check for duplicate username
@@ -158,6 +162,9 @@ export const userService = {
         if (data.commissionRate !== undefined) {
             if (data.commissionRate < 0 || data.commissionRate > 100) {
                 throw new ValidationError('Commission rate must be between 0 and 100');
+            }
+            if (!hasMaxTwoDecimals(data.commissionRate)) {
+                throw new ValidationError('Commission rate must have at most 2 decimal places');
             }
         }
 

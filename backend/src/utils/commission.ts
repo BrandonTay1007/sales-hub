@@ -3,6 +3,8 @@
  * CRITICAL: These functions implement the commission snapshot logic
  */
 
+import { hasMaxTwoDecimals, roundToTwoDecimals } from './validation';
+
 export interface Product {
     name: string;
     qty: number;
@@ -12,22 +14,26 @@ export interface Product {
 /**
  * Calculate the total order amount from products
  * Formula: SUM(quantity × basePrice) for all products
+ * Result is rounded to 2 decimal places
  */
 export function calculateOrderTotal(products: Product[]): number {
-    return products.reduce((sum, product) => {
+    const total = products.reduce((sum, product) => {
         return sum + (product.qty * product.basePrice);
     }, 0);
+    return roundToTwoDecimals(total);
 }
 
 /**
  * Calculate commission amount based on order total and snapshot rate
  * Formula: orderTotal × (snapshotRate / 100)
+ * Result is rounded to 2 decimal places
  * 
  * IMPORTANT: The snapshotRate is captured at order creation time
  * and NEVER changes, even if the sales person's rate changes later.
  */
 export function calculateCommission(orderTotal: number, snapshotRate: number): number {
-    return orderTotal * (snapshotRate / 100);
+    const commission = orderTotal * (snapshotRate / 100);
+    return roundToTwoDecimals(commission);
 }
 
 /**
@@ -62,6 +68,10 @@ export function validateProducts(products: unknown): { valid: boolean; error?: s
 
         if (typeof product.basePrice !== 'number' || product.basePrice < 0) {
             return { valid: false, error: `Product at index ${i}: basePrice must be a non-negative number` };
+        }
+
+        if (!hasMaxTwoDecimals(product.basePrice)) {
+            return { valid: false, error: `Product at index ${i}: basePrice must have at most 2 decimal places` };
         }
 
         validatedProducts.push({

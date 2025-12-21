@@ -46,6 +46,7 @@ describe('Orders API - Commission Snapshot', () => {
         // Create campaign for sales user
         const campaign = await prisma.campaign.create({
             data: {
+                referenceId: 'FB-TEST-ORDER',
                 title: 'Test Campaign',
                 platform: 'facebook',
                 type: 'post',
