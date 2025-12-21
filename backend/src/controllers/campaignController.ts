@@ -64,7 +64,7 @@ export const campaignController = {
      */
     async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
-            const { title, platform, type, url, salesPersonId } = req.body;
+            const { title, platform, type, url, salesPersonId, startDate } = req.body;
 
             // Validate required fields
             if (!title || typeof title !== 'string' || title.length < 3) {
@@ -89,6 +89,7 @@ export const campaignController = {
                 type,
                 url,
                 salesPersonId,
+                startDate: startDate ? new Date(startDate) : null,
             });
 
             res.status(201).json({
@@ -108,7 +109,7 @@ export const campaignController = {
     async update(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { title, platform, type, url, status, salesPersonId } = req.body;
+            const { title, platform, type, url, status, salesPersonId, startDate, endDate } = req.body;
 
             // IMMUTABLE: Reject attempts to change salesPersonId
             if (salesPersonId !== undefined) {
@@ -135,6 +136,8 @@ export const campaignController = {
                 type,
                 url,
                 status,
+                startDate: startDate !== undefined ? (startDate ? new Date(startDate) : null) : undefined,
+                endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : undefined,
             });
 
             res.json({

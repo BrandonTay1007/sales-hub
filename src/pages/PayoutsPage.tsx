@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { orders, campaigns, users } from '@/lib/mockData';
+import { ordersApi, campaignsApi, getErrorMessage, type Order, type Campaign } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate, Link, useNavigate } from 'react-router-dom';
-import { Calendar, Download, MessageSquare, TrendingUp, Target, ChevronDown, ChevronRight } from 'lucide-react';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { Calendar, Download, MessageSquare, TrendingUp, ChevronDown, ChevronRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 
 const PayoutsPage = () => {
@@ -42,8 +44,33 @@ const PayoutsPage = () => {
     { value: 12, label: 'December', short: 'Dec' },
   ];
 
+  // Fetch campaigns for this user
+  const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: async () => {
+      const response = await campaignsApi.list();
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+  });
+
+  // Fetch all orders (API returns only user's orders for non-admin)
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      const response = await ordersApi.list({});
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+  });
+
+  const isLoading = campaignsLoading || ordersLoading;
+
   // Get user's campaigns
-  const userCampaigns = campaigns.filter(c => c.assignedSalesPersonId === user?.id);
+  const userCampaigns = useMemo(() =>
+    campaigns.filter(c => c.salesPersonId === user?.id),
+    [campaigns, user?.id]
+  );
 
   // Get user's orders for selected month
   const userMonthOrders = useMemo(() => {
@@ -51,12 +78,11 @@ const PayoutsPage = () => {
       const orderDate = new Date(order.createdAt);
       const matchesDate = orderDate.getFullYear() === selectedYear &&
         (orderDate.getMonth() + 1) === selectedMonth;
-      const isActive = order.status === 'active';
       const belongsToUser = userCampaigns.some(c => c.id === order.campaignId);
       const matchesCampaign = !filterCampaign || order.campaignId === filterCampaign;
-      return matchesDate && isActive && belongsToUser && matchesCampaign;
+      return matchesDate && belongsToUser && matchesCampaign;
     });
-  }, [selectedYear, selectedMonth, userCampaigns, filterCampaign]);
+  }, [orders, selectedYear, selectedMonth, userCampaigns, filterCampaign]);
 
   // Calculate totals
   const totalSales = userMonthOrders.reduce((sum, o) => sum + o.orderTotal, 0);
@@ -96,9 +122,8 @@ const PayoutsPage = () => {
         const orderDate = new Date(order.createdAt);
         const matchesDate = orderDate.getFullYear() === year &&
           (orderDate.getMonth() + 1) === month;
-        const isActive = order.status === 'active';
         const belongsToUser = userCampaigns.some(c => c.id === order.campaignId);
-        return matchesDate && isActive && belongsToUser;
+        return matchesDate && belongsToUser;
       });
 
       const commission = monthOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
@@ -108,10 +133,10 @@ const PayoutsPage = () => {
       });
     }
     return result;
-  }, [currentMonth, currentYear, userCampaigns]);
+  }, [orders, currentMonth, currentYear, userCampaigns]);
 
   // Calculate progress toward monthly target
-  const monthlyTarget = user?.monthlyTarget || 5000;
+  const monthlyTarget = 5000;
   const progressPercent = Math.min((totalSales / monthlyTarget) * 100, 100);
 
   const handleDispute = () => {
@@ -209,45 +234,56 @@ const PayoutsPage = () => {
           <h2 className="text-lg font-semibold text-foreground mb-4">
             Your Commission for {months.find(m => m.value === selectedMonth)?.label} {selectedYear}
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Sales</p>
-              <p className="text-3xl font-bold text-foreground">RM {totalSales.toFixed(2)}</p>
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {[1, 2, 3].map(i => (
+                <div key={i}>
+                  <Skeleton className="h-4 w-20 mb-2" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              ))}
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Commission Earned</p>
-              <p className="text-3xl font-bold text-success">RM {totalCommission.toFixed(2)}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="relative w-16 h-16">
-                <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
-                  <path
-                    className="text-secondary"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  <path
-                    className="text-primary"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    fill="none"
-                    strokeDasharray={`${progressPercent}, 100`}
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                </svg>
-                <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
-                  {Math.round(progressPercent)}%
-                </span>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Sales</p>
+                <p className="text-3xl font-bold text-foreground">RM {totalSales.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Monthly Target</p>
-                <p className="text-sm font-medium">RM {totalSales.toFixed(0)} / {monthlyTarget}</p>
+                <p className="text-sm text-muted-foreground">Commission Earned</p>
+                <p className="text-3xl font-bold text-success">RM {totalCommission.toFixed(2)}</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="relative w-16 h-16">
+                  <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 36 36">
+                    <path
+                      className="text-secondary"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                    <path
+                      className="text-primary"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      fill="none"
+                      strokeDasharray={`${progressPercent}, 100`}
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+                    {Math.round(progressPercent)}%
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Monthly Target</p>
+                  <p className="text-sm font-medium">RM {totalSales.toFixed(0)} / {monthlyTarget}</p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Earnings Trend Chart */}
@@ -291,11 +327,20 @@ const PayoutsPage = () => {
           </div>
         </div>
 
-        {/* Campaign Breakdown - Flat List */}
+        {/* Campaign Breakdown */}
         <div className="space-y-4">
           <h3 className="font-semibold text-foreground">Campaign Breakdown</h3>
 
-          {campaignBreakdown.length === 0 ? (
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="dashboard-card">
+                  <Skeleton className="h-6 w-48 mb-2" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              ))}
+            </div>
+          ) : campaignBreakdown.length === 0 ? (
             <div className="dashboard-card text-center py-8">
               <p className="text-muted-foreground">No orders found for this period</p>
             </div>
@@ -363,7 +408,7 @@ const PayoutsPage = () => {
                         <tbody>
                           {breakdown.orders.map((order) => (
                             <tr key={order.id} className="border-b border-border/50">
-                              <td className="py-2">{order.createdAt}</td>
+                              <td className="py-2">{order.createdAt.split('T')[0]}</td>
                               <td className="py-2 text-muted-foreground text-xs">
                                 {order.products.map(p => `${p.name} (${p.qty})`).join(', ')}
                               </td>

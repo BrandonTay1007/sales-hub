@@ -51,10 +51,13 @@ The system needs to track sales person performance based on campaigns and sales 
 |-------|------|-------------|
 | id | UUID | Primary Key |
 | title | string | Required |
-| socialMedia | enum | `facebook` or `instagram` |
+| platform | enum | `facebook` or `instagram` |
 | type | enum | `post`, `event`, or `live` |
 | url | string | Required, valid URL |
 | salesPersonId | UUID | FK → User, **IMMUTABLE after creation** |
+| status | enum | `active`, `paused`, or `completed`, default: `active` |
+| startDate | datetime | Required, defaults to creation date |
+| endDate | datetime | Nullable, auto-set when status changes to `completed` |
 | createdAt | timestamp | Auto-generated |
 | updatedAt | timestamp | Auto-updated |
 
@@ -67,14 +70,15 @@ The system needs to track sales person performance based on campaigns and sales 
 | orderTotal | decimal | Calculated field |
 | snapshotRate | decimal | Commission % locked at order creation |
 | commissionAmount | decimal | Calculated field |
-| createdAt | timestamp | Auto-generated |
+| status | enum | `active` or `cancelled`, default: `active` |
+| createdAt | timestamp | Editable (date picker allows setting historical dates) |
 | updatedAt | timestamp | Auto-updated |
 
 #### Product Object Structure (within Order.products)
 ```json
 {
   "name": "string",
-  "quantity": "integer",
+  "qty": "integer",
   "basePrice": "decimal"
 }
 ```
@@ -199,15 +203,15 @@ commissionAmount = orderTotal × (snapshotRate / 100)
 | PUT | `/api/campaigns/:id` | Update campaign (salesPersonId immutable!) | Admin only |
 | DELETE | `/api/campaigns/:id` | Delete campaign + cascade orders | Admin only |
 
-### Orders
+### Orders (Admin Only)
 
 | Method | Endpoint | Description | Access |
 |--------|----------|-------------|--------|
 | GET | `/api/orders` | List orders (filterable) | Admin: all, Sales: only from their campaigns |
 | GET | `/api/orders/:id` | Get single order | Admin: any, Sales: only from their campaigns |
-| POST | `/api/orders` | Create order | Admin or Sales (for their campaigns) |
-| PUT | `/api/orders/:id` | Update order products | Admin or Sales (for their campaigns) |
-| DELETE | `/api/orders/:id` | Delete order | Admin or Sales (for their campaigns) |
+| POST | `/api/orders` | Create order | **Admin only** |
+| PUT | `/api/orders/:id` | Update order products | **Admin only** |
+| DELETE | `/api/orders/:id` | Delete order | **Admin only** |
 
 #### Order Query Parameters
 - `campaignId` - Filter by campaign

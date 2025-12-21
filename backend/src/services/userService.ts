@@ -137,6 +137,23 @@ export const userService = {
             throw new NotFoundError('User not found');
         }
 
+        // Last admin protection: prevent deactivating the last admin
+        if (data.status === 'inactive' && existing.role === 'admin') {
+            const otherActiveAdmins = await prisma.user.count({
+                where: {
+                    role: 'admin',
+                    status: 'active',
+                    id: { not: id },
+                },
+            });
+
+            if (otherActiveAdmins === 0) {
+                throw new ValidationError(
+                    'Cannot deactivate the last admin. Please add another admin before deactivating.'
+                );
+            }
+        }
+
         // Validate commission rate if provided
         if (data.commissionRate !== undefined) {
             if (data.commissionRate < 0 || data.commissionRate > 100) {

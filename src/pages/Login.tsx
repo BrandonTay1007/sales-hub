@@ -1,29 +1,33 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogIn } from 'lucide-react';
+import { LogIn, Loader2 } from 'lucide-react';
 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    
+
     if (!username || !password) {
       setError('Please fill in all fields');
       return;
     }
 
-    const success = login(username, password);
-    if (success) {
+    setIsLoading(true);
+    const result = await login(username, password);
+    setIsLoading(false);
+
+    if (result.success) {
       navigate('/dashboard');
     } else {
-      setError('Invalid credentials. Try: admin, sarah.j, or mike.c');
+      setError(result.error || 'Invalid credentials');
     }
   };
 
@@ -68,13 +72,20 @@ const Login = () => {
               <p className="text-sm text-destructive bg-destructive/10 px-3 py-2 rounded-md">{error}</p>
             )}
 
-            <button type="submit" className="btn-primary w-full">
-              Sign In
+            <button type="submit" className="btn-primary w-full" disabled={isLoading}>
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Signing in...
+                </span>
+              ) : (
+                'Sign In'
+              )}
             </button>
           </form>
 
           <p className="text-xs text-muted-foreground text-center mt-6">
-            Demo users: admin, sarah.j, mike.c (any password)
+            Admin: admin/admin123 | Sales: sarah.j/password123
           </p>
         </div>
       </div>

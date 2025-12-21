@@ -19,7 +19,7 @@ export interface Campaign {
   type: 'post' | 'live' | 'event';
   url: string;
   assignedSalesPersonId: string;
-  status: 'active' | 'paused' | 'completed';
+  status: 'active' | 'completed';
   createdAt: string;
   startDate?: string;
   endDate?: string;
@@ -33,7 +33,6 @@ export interface Order {
   snapshotRate: number;
   commissionAmount: number;
   createdAt: string;
-  status: 'active' | 'cancelled';
   createdHour?: number;
 }
 
@@ -47,22 +46,22 @@ export interface Notification {
 
 // 5 Sales Persons + 1 Admin
 export const users: User[] = [
-  { 
-    id: '1', 
-    name: 'Admin User', 
-    username: 'admin', 
-    role: 'admin', 
-    commissionRate: 0, 
+  {
+    id: '1',
+    name: 'Admin User',
+    username: 'admin',
+    role: 'admin',
+    commissionRate: 0,
     status: 'active',
     avatar: 'AU',
     rateHistory: []
   },
-  { 
-    id: '2', 
-    name: 'Sarah Johnson', 
-    username: 'sarah.j', 
-    role: 'sales', 
-    commissionRate: 12, 
+  {
+    id: '2',
+    name: 'Sarah Johnson',
+    username: 'sarah.j',
+    role: 'sales',
+    commissionRate: 12,
     status: 'active',
     avatar: 'SJ',
     monthlyTarget: 5000,
@@ -72,12 +71,12 @@ export const users: User[] = [
       { date: '2025-01-01', rate: 12 },
     ]
   },
-  { 
-    id: '3', 
-    name: 'Mike Chen', 
-    username: 'mike.c', 
-    role: 'sales', 
-    commissionRate: 15, 
+  {
+    id: '3',
+    name: 'Mike Chen',
+    username: 'mike.c',
+    role: 'sales',
+    commissionRate: 15,
     status: 'active',
     avatar: 'MC',
     monthlyTarget: 6000,
@@ -87,12 +86,12 @@ export const users: User[] = [
       { date: '2025-06-01', rate: 15 },
     ]
   },
-  { 
-    id: '4', 
-    name: 'Emily Davis', 
-    username: 'emily.d', 
-    role: 'sales', 
-    commissionRate: 10, 
+  {
+    id: '4',
+    name: 'Emily Davis',
+    username: 'emily.d',
+    role: 'sales',
+    commissionRate: 10,
     status: 'active',
     avatar: 'ED',
     monthlyTarget: 4000,
@@ -101,12 +100,12 @@ export const users: User[] = [
       { date: '2025-03-01', rate: 10 },
     ]
   },
-  { 
-    id: '5', 
-    name: 'Alex Rivera', 
-    username: 'alex.r', 
-    role: 'sales', 
-    commissionRate: 11, 
+  {
+    id: '5',
+    name: 'Alex Rivera',
+    username: 'alex.r',
+    role: 'sales',
+    commissionRate: 11,
     status: 'active',
     avatar: 'AR',
     monthlyTarget: 4500,
@@ -115,12 +114,12 @@ export const users: User[] = [
       { date: '2025-02-01', rate: 11 },
     ]
   },
-  { 
-    id: '6', 
-    name: 'Jessica Wong', 
-    username: 'jessica.w', 
-    role: 'sales', 
-    commissionRate: 13, 
+  {
+    id: '6',
+    name: 'Jessica Wong',
+    username: 'jessica.w',
+    role: 'sales',
+    commissionRate: 13,
     status: 'inactive',
     avatar: 'JW',
     monthlyTarget: 5500,
@@ -185,14 +184,14 @@ const products = [
 const generateOrders = (): Order[] => {
   const generatedOrders: Order[] = [];
   let orderId = 1;
-  
+
   const campaignRates: Record<string, number> = {
     '1': 12, '2': 15, '3': 12, '4': 15, '5': 10, '6': 11,
     '7': 10, '8': 11, '9': 12, '10': 15, '11': 10, '12': 11
   };
 
   // December 2025 - Current month with most data
-  const dec2025Days = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17];
+  const dec2025Days = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
   dec2025Days.forEach(day => {
     const ordersPerDay = Math.floor(Math.random() * 4) + 2; // 2-5 orders per day
     for (let i = 0; i < ordersPerDay; i++) {
@@ -200,17 +199,17 @@ const generateOrders = (): Order[] => {
       const numProducts = Math.floor(Math.random() * 3) + 1;
       const orderProducts = [];
       let total = 0;
-      
+
       for (let p = 0; p < numProducts; p++) {
         const product = products[Math.floor(Math.random() * products.length)];
         const qty = Math.floor(Math.random() * 3) + 1;
         orderProducts.push({ name: product.name, qty, basePrice: product.basePrice });
         total += product.basePrice * qty;
       }
-      
+
       const rate = campaignRates[campaignId] || 10;
       const commission = total * (rate / 100);
-      
+
       generatedOrders.push({
         id: String(orderId++),
         campaignId,
@@ -219,7 +218,6 @@ const generateOrders = (): Order[] => {
         snapshotRate: rate,
         commissionAmount: Math.round(commission * 100) / 100,
         createdAt: `2025-12-${day.toString().padStart(2, '0')}`,
-        status: Math.random() > 0.95 ? 'cancelled' : 'active',
         createdHour: Math.floor(Math.random() * 14) + 8, // 8am - 10pm
       });
     }
@@ -233,17 +231,17 @@ const generateOrders = (): Order[] => {
       const numProducts = Math.floor(Math.random() * 2) + 1;
       const orderProducts = [];
       let total = 0;
-      
+
       for (let p = 0; p < numProducts; p++) {
         const product = products[Math.floor(Math.random() * products.length)];
         const qty = Math.floor(Math.random() * 2) + 1;
         orderProducts.push({ name: product.name, qty, basePrice: product.basePrice });
         total += product.basePrice * qty;
       }
-      
+
       const rate = campaignRates[campaignId] || 10;
       const commission = total * (rate / 100);
-      
+
       generatedOrders.push({
         id: String(orderId++),
         campaignId,
@@ -252,7 +250,6 @@ const generateOrders = (): Order[] => {
         snapshotRate: rate,
         commissionAmount: Math.round(commission * 100) / 100,
         createdAt: `2025-11-${day.toString().padStart(2, '0')}`,
-        status: Math.random() > 0.92 ? 'cancelled' : 'active',
         createdHour: Math.floor(Math.random() * 14) + 8,
       });
     }
@@ -265,7 +262,7 @@ const generateOrders = (): Order[] => {
     const qty = Math.floor(Math.random() * 2) + 1;
     const total = product.basePrice * qty;
     const rate = campaignRates[campaignId] || 10;
-    
+
     generatedOrders.push({
       id: String(orderId++),
       campaignId,
@@ -274,7 +271,6 @@ const generateOrders = (): Order[] => {
       snapshotRate: rate,
       commissionAmount: Math.round(total * (rate / 100) * 100) / 100,
       createdAt: `2025-10-${day.toString().padStart(2, '0')}`,
-      status: 'active',
       createdHour: Math.floor(Math.random() * 14) + 8,
     });
   });
@@ -288,7 +284,7 @@ const generateOrders = (): Order[] => {
       const qty = Math.floor(Math.random() * 2) + 1;
       const total = product.basePrice * qty;
       const rate = campaignRates[campaignId] || 10;
-      
+
       generatedOrders.push({
         id: String(orderId++),
         campaignId,
@@ -297,13 +293,12 @@ const generateOrders = (): Order[] => {
         snapshotRate: rate,
         commissionAmount: Math.round(total * (rate / 100) * 100) / 100,
         createdAt: `2025-${month}-${day.toString().padStart(2, '0')}`,
-        status: 'active',
         createdHour: Math.floor(Math.random() * 14) + 8,
       });
     });
   });
 
-  return generatedOrders.sort((a, b) => 
+  return generatedOrders.sort((a, b) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 };
@@ -319,13 +314,13 @@ export const notifications: Notification[] = [
 export const currentUser = users[0];
 
 // Helper functions for analytics
-export const getOrdersByCampaign = (campaignId: string) => 
-  orders.filter(o => o.campaignId === campaignId && o.status === 'active');
+export const getOrdersByCampaign = (campaignId: string) =>
+  orders.filter(o => o.campaignId === campaignId);
 
-export const getCampaignRevenue = (campaignId: string) => 
+export const getCampaignRevenue = (campaignId: string) =>
   getOrdersByCampaign(campaignId).reduce((sum, o) => sum + o.orderTotal, 0);
 
-export const getCampaignCommission = (campaignId: string) => 
+export const getCampaignCommission = (campaignId: string) =>
   getOrdersByCampaign(campaignId).reduce((sum, o) => sum + o.commissionAmount, 0);
 
 export const getTopPerformer = () => {
@@ -348,14 +343,14 @@ export const getTopPerformer = () => {
 export const getDailySales = (days: number = 7) => {
   const result: { date: string; sales: number; orders: number; label: string }[] = [];
   const today = new Date('2025-12-17');
-  
+
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
-    const dayOrders = orders.filter(o => o.createdAt === dateStr && o.status === 'active');
+    const dayOrders = orders.filter(o => o.createdAt === dateStr);
     const daySales = dayOrders.reduce((sum, o) => sum + o.orderTotal, 0);
-    
+
     result.push({
       date: dateStr,
       sales: Math.round(daySales * 100) / 100,
@@ -363,7 +358,7 @@ export const getDailySales = (days: number = 7) => {
       label: date.toLocaleDateString('en-US', { weekday: 'short' }),
     });
   }
-  
+
   return result;
 };
 
@@ -371,8 +366,8 @@ export const getMonthlyRevenue = () => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return months.map((month, index) => {
     const monthStr = (index + 1).toString().padStart(2, '0');
-    const monthOrders = orders.filter(o => 
-      o.createdAt.startsWith(`2025-${monthStr}`) && o.status === 'active'
+    const monthOrders = orders.filter(o =>
+      o.createdAt.startsWith(`2025-${monthStr}`)
     );
     const revenue = monthOrders.reduce((sum, o) => sum + o.orderTotal, 0);
     return { month, revenue: Math.round(revenue * 100) / 100 };
@@ -392,11 +387,11 @@ export const getPlatformRevenue = () => {
   const fbRevenue = campaigns
     .filter(c => c.platform === 'facebook')
     .reduce((sum, c) => sum + getCampaignRevenue(c.id), 0);
-  
+
   const igRevenue = campaigns
     .filter(c => c.platform === 'instagram')
     .reduce((sum, c) => sum + getCampaignRevenue(c.id), 0);
-  
+
   return [
     { name: 'Facebook', value: Math.round(fbRevenue * 100) / 100, fill: 'hsl(var(--chart-1))' },
     { name: 'Instagram', value: Math.round(igRevenue * 100) / 100, fill: 'hsl(var(--chart-2))' },
@@ -405,7 +400,6 @@ export const getPlatformRevenue = () => {
 
 export const getRecentActivity = (limit: number = 10) => {
   return orders
-    .filter(o => o.status === 'active')
     .slice(0, limit)
     .map(order => {
       const campaign = campaigns.find(c => c.id === order.campaignId);
@@ -420,8 +414,8 @@ export const getRecentActivity = (limit: number = 10) => {
         campaignTitle: campaign?.title || 'Campaign',
         amount: order.orderTotal,
         date: order.createdAt,
-        timestamp: new Date(order.createdAt).toLocaleDateString('en-US', { 
-          month: 'short', 
+        timestamp: new Date(order.createdAt).toLocaleDateString('en-US', {
+          month: 'short',
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit'
@@ -461,6 +455,22 @@ export const getLeaderboard = () => {
     .sort((a, b) => b.totalRevenue - a.totalRevenue);
 };
 
+export const getCampaignLeaderboard = () => {
+  return campaigns
+    .map(c => {
+      const salesPerson = users.find(u => u.id === c.assignedSalesPersonId);
+      return {
+        id: c.id,
+        title: c.title,
+        revenue: getCampaignRevenue(c.id),
+        platform: c.platform,
+        salesPersonName: salesPerson?.name || 'Unknown',
+        salesPersonAvatar: salesPerson?.avatar || '?',
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+};
+
 export const getRevenueByType = () => {
   const types = ['post', 'live', 'event'] as const;
   return types.map(type => {
@@ -473,9 +483,9 @@ export const getRevenueByType = () => {
 export const getHourlyHeatmap = () => {
   const hours = Array.from({ length: 14 }, (_, i) => i + 8); // 8am to 9pm
   const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  
+
   const heatmap: { day: string; hour: number; value: number }[] = [];
-  
+
   days.forEach((day, dayIndex) => {
     hours.forEach(hour => {
       // Simulate activity based on typical patterns
@@ -485,18 +495,18 @@ export const getHourlyHeatmap = () => {
       if (hour >= 18 && hour <= 21) baseValue *= 2;
       // Weekends have different patterns
       if (dayIndex >= 5) baseValue *= 1.3;
-      
+
       heatmap.push({ day, hour, value: Math.round(baseValue) });
     });
   });
-  
+
   return heatmap;
 };
 
 export const getTopProducts = () => {
   const productSales: Record<string, { name: string; qty: number; revenue: number }> = {};
-  
-  orders.filter(o => o.status === 'active').forEach(order => {
+
+  orders.forEach(order => {
     order.products.forEach(product => {
       if (!productSales[product.name]) {
         productSales[product.name] = { name: product.name, qty: 0, revenue: 0 };
@@ -505,7 +515,7 @@ export const getTopProducts = () => {
       productSales[product.name].revenue += product.basePrice * product.qty;
     });
   });
-  
+
   return Object.values(productSales)
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10)
@@ -513,22 +523,20 @@ export const getTopProducts = () => {
 };
 
 export const getAvgOrderValue = () => {
-  const activeOrders = orders.filter(o => o.status === 'active');
-  if (activeOrders.length === 0) return 0;
-  const total = activeOrders.reduce((sum, o) => sum + o.orderTotal, 0);
-  return Math.round((total / activeOrders.length) * 100) / 100;
+  if (orders.length === 0) return 0;
+  const total = orders.reduce((sum, o) => sum + o.orderTotal, 0);
+  return Math.round((total / orders.length) * 100) / 100;
 };
 
 export const getMonthlyEarnings = (userId: string) => {
   const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const userCampaigns = campaigns.filter(c => c.assignedSalesPersonId === userId);
-  
+
   return months.map((month, index) => {
     const monthNum = index + 7; // July = 7
     const monthStr = monthNum.toString().padStart(2, '0');
-    const monthOrders = orders.filter(o => 
-      o.createdAt.startsWith(`2025-${monthStr}`) && 
-      o.status === 'active' &&
+    const monthOrders = orders.filter(o =>
+      o.createdAt.startsWith(`2025-${monthStr}`) &&
       userCampaigns.some(c => c.id === o.campaignId)
     );
     const earnings = monthOrders.reduce((sum, o) => sum + o.commissionAmount, 0);

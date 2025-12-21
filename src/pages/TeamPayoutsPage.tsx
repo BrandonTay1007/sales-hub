@@ -1,10 +1,12 @@
 import { Fragment, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { orders, campaigns, users } from '@/lib/mockData';
+import { ordersApi, campaignsApi, usersApi, getErrorMessage, type Order, type Campaign, type User } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Calendar, Download, ChevronDown, ChevronRight, Users as UsersIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const TeamPayoutsPage = () => {
   const { isAdmin } = useAuth();
@@ -44,31 +46,60 @@ const AdminTeamPayouts = () => {
     { value: 12, label: 'December' },
   ];
 
+  // Fetch all required data
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const response = await usersApi.list();
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+  });
+
+  const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: async () => {
+      const response = await campaignsApi.list();
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+  });
+
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      const response = await ordersApi.list({});
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+  });
+
+  const isLoading = usersLoading || campaignsLoading || ordersLoading;
+
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
       const orderDate = new Date(order.createdAt);
       const matchesDate =
         orderDate.getFullYear() === selectedYear &&
         orderDate.getMonth() + 1 === selectedMonth;
-      const isActive = order.status === 'active';
-      return matchesDate && isActive;
+      return matchesDate;
     });
-  }, [selectedYear, selectedMonth]);
+  }, [orders, selectedYear, selectedMonth]);
 
   // Calculate YTD orders for each user
   const ytdOrders = useMemo(() => {
     return orders.filter((order) => {
       const orderDate = new Date(order.createdAt);
-      return orderDate.getFullYear() === selectedYear && order.status === 'active';
+      return orderDate.getFullYear() === selectedYear;
     });
-  }, [selectedYear]);
+  }, [orders, selectedYear]);
 
   const salesPersonPayouts = useMemo(() => {
     const salesUsers = users.filter((u) => u.role === 'sales');
 
     return salesUsers.map((salesUser) => {
       const userCampaigns = campaigns.filter(
-        (c) => c.assignedSalesPersonId === salesUser.id,
+        (c) => c.salesPersonId === salesUser.id,
       );
       const userOrders = filteredOrders.filter((o) =>
         userCampaigns.some((c) => c.id === o.campaignId),
@@ -124,7 +155,7 @@ const AdminTeamPayouts = () => {
             : salesUser.commissionRate,
       };
     });
-  }, [filteredOrders, ytdOrders]);
+  }, [users, campaigns, filteredOrders, ytdOrders]);
 
   const sortedPayouts = useMemo(() => {
     return [...salesPersonPayouts].sort((a, b) => {
@@ -148,6 +179,10 @@ const AdminTeamPayouts = () => {
   const handleExport = () => {
     // Mock export functionality
     alert('Export functionality would generate a CSV/PDF report here');
+  };
+
+  const getAvatar = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
@@ -219,164 +254,190 @@ const AdminTeamPayouts = () => {
               {selectedYear}
             </h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div>
-              <p className="text-sm text-muted-foreground">Total Sales</p>
-              <p className="text-3xl font-bold text-foreground">RM {totalSales.toFixed(2)}</p>
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {[1, 2, 3].map(i => (
+                <div key={i}>
+                  <Skeleton className="h-4 w-24 mb-2" />
+                  <Skeleton className="h-8 w-32" />
+                </div>
+              ))}
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Total Commission Owed</p>
-              <p className="text-3xl font-bold text-success">RM {totalPayout.toFixed(2)}</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Sales</p>
+                <p className="text-3xl font-bold text-foreground">RM {totalSales.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Commission Owed</p>
+                <p className="text-3xl font-bold text-success">RM {totalPayout.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Active Team Members</p>
+                <p className="text-3xl font-bold text-foreground">
+                  {sortedPayouts.filter((p) => p.orderCount > 0).length}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Active Team Members</p>
-              <p className="text-3xl font-bold text-foreground">
-                {sortedPayouts.filter((p) => p.orderCount > 0).length}
-              </p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Team Members Table with Inline Expansion */}
         <div className="dashboard-card overflow-hidden p-0">
-          <table className="w-full">
-            <thead className="bg-secondary/50">
-              <tr>
-                <th className="table-header w-8"></th>
-                <th className="table-header">Sales Person</th>
-                <th className="table-header text-right">
-                  <Tooltip>
-                    <TooltipTrigger>This Month</TooltipTrigger>
-                    <TooltipContent>Commission for selected month</TooltipContent>
-                  </Tooltip>
-                </th>
-                <th className="table-header text-right">
-                  <Tooltip>
-                    <TooltipTrigger>YTD</TooltipTrigger>
-                    <TooltipContent>Year-to-date commission</TooltipContent>
-                  </Tooltip>
-                </th>
-                <th className="table-header text-right">
-                  <Tooltip>
-                    <TooltipTrigger>Avg Rate</TooltipTrigger>
-                    <TooltipContent>
-                      Average snapshot rate for this month's orders
-                    </TooltipContent>
-                  </Tooltip>
-                </th>
-                <th className="table-header text-center">Orders</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedPayouts.map((payout) => {
-                const isExpanded = expandedUsers.includes(payout.user.id);
-                return (
-                  <Fragment key={payout.user.id}>
-                    <tr
-                      className={`table-row cursor-pointer hover:bg-secondary/50 ${isExpanded ? 'bg-secondary/30' : ''
-                        }`}
-                      onClick={() => toggleExpanded(payout.user.id)}
-                    >
-                      <td className="table-cell">
-                        {isExpanded ? (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </td>
-                      <td className="table-cell">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
-                            {payout.user.avatar}
-                          </div>
-                          <div>
-                            <p className="font-medium text-foreground">{payout.user.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Current Rate: {payout.user.commissionRate}%
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="table-cell text-right">
-                        <span className="text-lg font-bold text-success">
-                          RM {payout.totalCommission.toFixed(2)}
-                        </span>
-                        <p className="text-xs text-muted-foreground">
-                          from RM {payout.totalSales.toFixed(2)}
-                        </p>
-                      </td>
-                      <td className="table-cell text-right font-medium">
-                        RM {payout.ytdCommission.toFixed(2)}
-                      </td>
-                      <td className="table-cell text-right">
-                        <span className="text-primary font-medium">
-                          {payout.avgRate.toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="table-cell text-center">{payout.orderCount}</td>
-                    </tr>
-
-                    {/* Inline Expanded Details */}
-                    {isExpanded && (
-                      <tr>
-                        <td colSpan={6} className="p-0">
-                          <div className="bg-secondary/20 px-6 py-4 border-y border-border">
-                            <h4 className="text-sm font-semibold text-foreground mb-3">
-                              Campaign Breakdown
-                            </h4>
-                            {payout.campaignBreakdown.length === 0 ? (
-                              <p className="text-sm text-muted-foreground">
-                                No orders this month
+          {isLoading ? (
+            <div className="p-6 space-y-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="w-10 h-10 rounded-full" />
+                  <div className="flex-1">
+                    <Skeleton className="h-4 w-32 mb-2" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                  <Skeleton className="h-6 w-24" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead className="bg-secondary/50">
+                <tr>
+                  <th className="table-header w-8"></th>
+                  <th className="table-header">Sales Person</th>
+                  <th className="table-header text-right">
+                    <Tooltip>
+                      <TooltipTrigger>This Month</TooltipTrigger>
+                      <TooltipContent>Commission for selected month</TooltipContent>
+                    </Tooltip>
+                  </th>
+                  <th className="table-header text-right">
+                    <Tooltip>
+                      <TooltipTrigger>YTD</TooltipTrigger>
+                      <TooltipContent>Year-to-date commission</TooltipContent>
+                    </Tooltip>
+                  </th>
+                  <th className="table-header text-right">
+                    <Tooltip>
+                      <TooltipTrigger>Avg Rate</TooltipTrigger>
+                      <TooltipContent>
+                        Average snapshot rate for this month's orders
+                      </TooltipContent>
+                    </Tooltip>
+                  </th>
+                  <th className="table-header text-center">Orders</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedPayouts.map((payout) => {
+                  const isExpanded = expandedUsers.includes(payout.user.id);
+                  return (
+                    <Fragment key={payout.user.id}>
+                      <tr
+                        className={`table-row cursor-pointer hover:bg-secondary/50 ${isExpanded ? 'bg-secondary/30' : ''
+                          }`}
+                        onClick={() => toggleExpanded(payout.user.id)}
+                      >
+                        <td className="table-cell">
+                          {isExpanded ? (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </td>
+                        <td className="table-cell">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
+                              {getAvatar(payout.user.name)}
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">{payout.user.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                Current Rate: {payout.user.commissionRate}%
                               </p>
-                            ) : (
-                              <div className="space-y-3">
-                                {payout.campaignBreakdown.map((breakdown) => (
-                                  <div
-                                    key={breakdown.campaign.id}
-                                    className="bg-background rounded-lg p-3 border border-border cursor-pointer hover:bg-secondary/30 transition-colors"
-                                    onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
-                                  >
-                                    <div className="flex items-center justify-between mb-2">
-                                      <span className="font-medium text-foreground hover:text-primary">
-                                        {breakdown.campaign.title}
-                                      </span>
-                                      <span className="text-success font-semibold">
-                                        RM {breakdown.totalCommission.toFixed(2)}
-                                      </span>
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                      <span>
-                                        Sales: RM {breakdown.totalSales.toFixed(2)}
-                                      </span>
-                                      <span className="mx-2">•</span>
-                                      <span>{breakdown.orders.length} orders</span>
-                                      <span className="mx-2">•</span>
-                                      <Tooltip>
-                                        <TooltipTrigger className="underline decoration-dotted">
-                                          Formula
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                          <p>
-                                            RM {breakdown.totalSales.toFixed(2)} ×{' '}
-                                            {payout.user.commissionRate}% = RM{' '}
-                                            {breakdown.totalCommission.toFixed(2)}
-                                          </p>
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            </div>
                           </div>
                         </td>
+                        <td className="table-cell text-right">
+                          <span className="text-lg font-bold text-success">
+                            RM {payout.totalCommission.toFixed(2)}
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            from RM {payout.totalSales.toFixed(2)}
+                          </p>
+                        </td>
+                        <td className="table-cell text-right font-medium">
+                          RM {payout.ytdCommission.toFixed(2)}
+                        </td>
+                        <td className="table-cell text-right">
+                          <span className="text-primary font-medium">
+                            {payout.avgRate.toFixed(1)}%
+                          </span>
+                        </td>
+                        <td className="table-cell text-center">{payout.orderCount}</td>
                       </tr>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+
+                      {/* Inline Expanded Details */}
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={6} className="p-0">
+                            <div className="bg-secondary/20 px-6 py-4 border-y border-border">
+                              <h4 className="text-sm font-semibold text-foreground mb-3">
+                                Campaign Breakdown
+                              </h4>
+                              {payout.campaignBreakdown.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                  No orders this month
+                                </p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {payout.campaignBreakdown.map((breakdown) => (
+                                    <div
+                                      key={breakdown.campaign.id}
+                                      className="bg-background rounded-lg p-3 border border-border cursor-pointer hover:bg-secondary/30 transition-colors"
+                                      onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
+                                    >
+                                      <div className="flex items-center justify-between mb-2">
+                                        <span className="font-medium text-foreground hover:text-primary">
+                                          {breakdown.campaign.title}
+                                        </span>
+                                        <span className="text-success font-semibold">
+                                          RM {breakdown.totalCommission.toFixed(2)}
+                                        </span>
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">
+                                        <span>
+                                          Sales: RM {breakdown.totalSales.toFixed(2)}
+                                        </span>
+                                        <span className="mx-2">•</span>
+                                        <span>{breakdown.orders.length} orders</span>
+                                        <span className="mx-2">•</span>
+                                        <Tooltip>
+                                          <TooltipTrigger className="underline decoration-dotted">
+                                            Formula
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>
+                                              RM {breakdown.totalSales.toFixed(2)} ×{' '}
+                                              {payout.user.commissionRate}% = RM{' '}
+                                              {breakdown.totalCommission.toFixed(2)}
+                                            </p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </DashboardLayout>
@@ -384,4 +445,3 @@ const AdminTeamPayouts = () => {
 };
 
 export default TeamPayoutsPage;
-

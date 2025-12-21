@@ -1,71 +1,121 @@
 import { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { campaigns, users, orders as initialOrders, Order } from '@/lib/mockData';
+import { ordersApi, campaignsApi, usersApi, type Order, type Campaign, type User, type Product, getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Trash2, Info, Filter, X, ShoppingCart, ArrowUpDown, Edit2 } from 'lucide-react';
+import { Plus, Filter, ArrowUpDown, ShoppingCart, X, Facebook, Instagram, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-
-interface ProductRow {
-  name: string;
-  qty: number;
-  basePrice: number;
-}
+import { Skeleton } from '@/components/ui/skeleton';
+import { OrderForm } from '@/components/OrderForm';
+import { OrderDetailsDialog, formatProductsSummary } from '@/components/OrderDetailsDialog';
+import { OrderEditModal } from '@/components/OrderEditModal';
+import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 
 type SortOption = 'latest' | 'oldest' | 'highest' | 'lowest';
 
 const OrdersPage = () => {
   const { user, isAdmin } = useAuth();
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [selectedCampaignId, setSelectedCampaignId] = useState('');
-  const [products, setProducts] = useState<ProductRow[]>([{ name: '', qty: 1, basePrice: 0 }]);
+  const queryClient = useQueryClient();
+
   const [showAddOrder, setShowAddOrder] = useState(false);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editProducts, setEditProducts] = useState<ProductRow[]>([]);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('latest');
 
   // Filters
   const [filterCampaign, setFilterCampaign] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterSalesPerson, setFilterSalesPerson] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [quickFilter, setQuickFilter] = useState<'all' | 'week' | 'month'>('all');
 
-  // Get user's campaigns for filtering
-  const userCampaigns = campaigns.filter(c => c.assignedSalesPersonId === user?.id);
+  // Fetch all required data
+  const { data: orders = [], isLoading: ordersLoading, error: ordersError } = useQuery({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      const response = await ordersApi.list({});
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+  });
+
+  const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: async () => {
+      const response = await campaignsApi.list();
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+  });
+
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const response = await usersApi.list();
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+    enabled: isAdmin, // Only fetch for admin - sales persons get 403
+  });
+
+  // Create lookup maps
+  const usersMap = useMemo(() => {
+    const map = new Map<string, User>();
+    users.forEach(u => map.set(u.id, u));
+    return map;
+  }, [users]);
+
+  const campaignsMap = useMemo(() => {
+    const map = new Map<string, Campaign>();
+    campaigns.forEach(c => map.set(c.id, c));
+    return map;
+  }, [campaigns]);
+
+  // Get sales persons for filter dropdown (admin only)
+  const salesPersons = useMemo(() =>
+    users.filter(u => u.role === 'sales'),
+    [users]
+  );
+
+  // Get user's campaigns for non-admin filtering
+  const userCampaigns = useMemo(() =>
+    campaigns.filter(c => c.salesPersonId === user?.id),
+    [campaigns, user?.id]
+  );
+
   const availableCampaigns = isAdmin ? campaigns : userCampaigns;
-  const activeCampaigns = availableCampaigns.filter(c => c.status === 'active');
+  const activeCampaigns = availableCampaigns.filter(c => (c as Campaign & { status?: string }).status !== 'completed');
 
-  const selectedCampaign = campaigns.find(c => c.id === selectedCampaignId);
-  const linkedSalesPerson = selectedCampaign
-    ? users.find(u => u.id === selectedCampaign.assignedSalesPersonId)
-    : null;
-
-  const orderTotal = products.reduce((sum, p) => sum + (p.qty * p.basePrice), 0);
-  const commissionAmount = linkedSalesPerson ? orderTotal * (linkedSalesPerson.commissionRate / 100) : 0;
-
+  // Filter and sort orders
   const filteredOrders = useMemo(() => {
-    // First filter by user's campaigns if not admin
     let filtered = isAdmin
       ? orders
       : orders.filter(o => userCampaigns.some(c => c.id === o.campaignId));
 
     // Apply quick filters
+    const now = new Date();
     if (quickFilter === 'week') {
-      const weekAgo = new Date('2025-12-10');
+      const weekAgo = new Date(now);
+      weekAgo.setDate(weekAgo.getDate() - 7);
       filtered = filtered.filter(o => new Date(o.createdAt) >= weekAgo);
     } else if (quickFilter === 'month') {
-      filtered = filtered.filter(o => o.createdAt.startsWith('2025-12'));
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      filtered = filtered.filter(o => new Date(o.createdAt) >= monthStart);
     }
 
     // Apply other filters
     filtered = filtered.filter(order => {
       if (filterCampaign && order.campaignId !== filterCampaign) return false;
-      if (filterStatus && order.status !== filterStatus) return false;
-      if (filterDateFrom && order.createdAt < filterDateFrom) return false;
-      if (filterDateTo && order.createdAt > filterDateTo) return false;
+      if (filterSalesPerson) {
+        const campaign = campaignsMap.get(order.campaignId);
+        if (!campaign || campaign.salesPersonId !== filterSalesPerson) return false;
+      }
+      const orderDate = order.createdAt.split('T')[0];
+      if (filterDateFrom && orderDate < filterDateFrom) return false;
+      if (filterDateTo && orderDate > filterDateTo) return false;
       return true;
     });
 
@@ -84,158 +134,125 @@ const OrdersPage = () => {
           return 0;
       }
     });
-  }, [orders, filterCampaign, filterStatus, filterDateFrom, filterDateTo, quickFilter, isAdmin, userCampaigns, sortBy]);
+  }, [orders, filterCampaign, filterSalesPerson, filterDateFrom, filterDateTo, quickFilter, isAdmin, userCampaigns, sortBy, campaignsMap]);
 
-  const addProductRow = () => {
-    setProducts([...products, { name: '', qty: 1, basePrice: 0 }]);
-  };
+  // Mutations
+  const createOrderMutation = useMutation({
+    mutationFn: async (data: { campaignId: string; products: Product[]; createdAt: string }) => {
+      const response = await ordersApi.create({
+        campaignId: data.campaignId,
+        products: data.products,
+      });
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setShowAddOrder(false);
+      toast.success('Order created successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to create order', { description: error.message });
+    },
+  });
 
-  const removeProductRow = (index: number) => {
-    if (products.length > 1) {
-      setProducts(products.filter((_, i) => i !== index));
-    }
-  };
+  const updateOrderMutation = useMutation({
+    mutationFn: async ({ id, products }: { id: string; products: Product[] }) => {
+      const response = await ordersApi.update(id, { products });
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setEditingOrder(null);
+      toast.success('Order updated!');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update order', { description: error.message });
+    },
+  });
 
-  const updateProduct = (index: number, field: keyof ProductRow, value: string | number) => {
-    const updated = [...products];
-    if (field === 'name') {
-      updated[index].name = value as string;
-    } else if (field === 'qty') {
-      updated[index].qty = Number(value) || 0;
-    } else if (field === 'basePrice') {
-      updated[index].basePrice = Number(value) || 0;
-    }
-    setProducts(updated);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCampaignId || !linkedSalesPerson) return;
-
-    // Validate at least 1 product
-    const validProducts = products.filter(p => p.name && p.qty > 0);
-    if (validProducts.length === 0) {
-      toast.error('Please add at least one product');
-      return;
-    }
-
-    const newOrder: Order = {
-      id: String(orders.length + 1),
-      campaignId: selectedCampaignId,
-      products: validProducts,
-      orderTotal,
-      snapshotRate: linkedSalesPerson.commissionRate,
-      commissionAmount,
-      createdAt: new Date().toISOString().split('T')[0],
-      status: 'active',
-    };
-
-    setOrders([...orders, newOrder]);
-    setSelectedCampaignId('');
-    setProducts([{ name: '', qty: 1, basePrice: 0 }]);
-    setShowAddOrder(false);
-    setSortBy('latest'); // Reset to default sort so new order appears at top
-    toast.success('Order created successfully!');
-  };
-
-  const deleteOrder = (orderId: string) => {
-    const orderToDelete = orders.find(o => o.id === orderId);
-    if (!orderToDelete) return;
-
-    // Check if user can delete (admin or owner) - although UI hides it, safer to check
-    const campaign = campaigns.find(c => c.id === orderToDelete.campaignId);
-    const canDelete = isAdmin || campaign?.assignedSalesPersonId === user?.id;
-
-    if (!canDelete) {
-      toast.error('You can only delete your own orders');
-      return;
-    }
-
-    // Remove order from state
-    setOrders(prev => prev.filter(o => o.id !== orderId));
-
-    // Show undo toast
-    toast.success('Order deleted', {
-      description: 'Order removed from records',
-      duration: 5000,
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          // Restore order in correct sorting position (simplest is just add back)
-          setOrders(prev => [...prev, orderToDelete].sort((a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          ));
-          toast.success('Order restored');
-        },
-      },
-    });
-  };
+  const deleteOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await ordersApi.delete(orderId);
+      if (!response.success) throw new Error(getErrorMessage(response));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setViewingOrder(null);
+      toast.success('Order deleted');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete order', { description: error.message });
+    },
+  });
 
   const clearFilters = () => {
     setFilterCampaign('');
-    setFilterStatus('');
+    setFilterSalesPerson('');
     setFilterDateFrom('');
     setFilterDateTo('');
     setQuickFilter('all');
   };
 
-  const hasFilters = filterCampaign || filterStatus || filterDateFrom || filterDateTo || quickFilter !== 'all';
+  const hasFilters = filterCampaign || filterSalesPerson || filterDateFrom || filterDateTo || quickFilter !== 'all';
+  const isLoading = ordersLoading || campaignsLoading || (isAdmin && usersLoading);
 
-  const handleRowClick = (order: Order) => {
-    setViewingOrder(order);
-    setIsEditMode(false);
-    setEditProducts(order.products.map(p => ({ ...p })));
+  const handleDeleteOrder = (orderId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setDeleteOrderId(orderId);
   };
 
-  const handleEditOrder = () => {
-    setIsEditMode(true);
+  const confirmDeleteOrder = () => {
+    if (!deleteOrderId) return;
+    const orderId = deleteOrderId;
+    setDeleteOrderId(null);
+
+    // Show undo toast with 5-second window
+    const toastId = toast.success('Order deleted', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          if (pendingDelete?.timer) {
+            clearTimeout(pendingDelete.timer);
+            setPendingDelete(null);
+            toast.dismiss(toastId);
+            toast.info('Deletion cancelled');
+          }
+        },
+      },
+      duration: 5000,
+    });
+
+    // Set timeout for actual deletion after 5 seconds
+    const timer = setTimeout(() => {
+      deleteOrderMutation.mutate(orderId);
+      setPendingDelete(null);
+    }, 5000);
+
+    setPendingDelete({ id: orderId, timer });
   };
 
-  const handleSaveEdit = () => {
-    if (!viewingOrder) return;
-
-    // Validate at least 1 product
-    const validProducts = editProducts.filter(p => p.name && p.qty > 0);
-    if (validProducts.length === 0) {
-      toast.error('Please add at least one product');
-      return;
-    }
-
-    const newTotal = validProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0);
-    const newCommission = newTotal * (viewingOrder.snapshotRate / 100);
-
-    setOrders(orders.map(o =>
-      o.id === viewingOrder.id
-        ? { ...o, products: validProducts, orderTotal: newTotal, commissionAmount: newCommission }
-        : o
-    ));
-
-    setViewingOrder({ ...viewingOrder, products: validProducts, orderTotal: newTotal, commissionAmount: newCommission });
-    setIsEditMode(false);
-    toast.success('Order updated!');
+  const handleEditOrder = (order: Order, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditingOrder(order);
   };
 
-  const updateEditProduct = (index: number, field: keyof ProductRow, value: string | number) => {
-    const updated = [...editProducts];
-    if (field === 'name') {
-      updated[index].name = value as string;
-    } else if (field === 'qty') {
-      updated[index].qty = Number(value) || 0;
-    } else if (field === 'basePrice') {
-      updated[index].basePrice = Number(value) || 0;
-    }
-    setEditProducts(updated);
-  };
-
-  const addEditProductRow = () => {
-    setEditProducts([...editProducts, { name: '', qty: 1, basePrice: 0 }]);
-  };
-
-  const removeEditProductRow = (index: number) => {
-    if (editProducts.length > 1) {
-      setEditProducts(editProducts.filter((_, i) => i !== index));
-    }
-  };
+  if (ordersError) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-12">
+          <p className="text-destructive">Failed to load orders</p>
+          <button
+            onClick={() => queryClient.invalidateQueries({ queryKey: ['orders'] })}
+            className="btn-primary mt-4"
+          >
+            Retry
+          </button>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -271,33 +288,18 @@ const OrdersPage = () => {
 
           {/* Quick Filter Toggles */}
           <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setQuickFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'all'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-            >
-              All Time
-            </button>
-            <button
-              onClick={() => setQuickFilter('week')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'week'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-            >
-              This Week
-            </button>
-            <button
-              onClick={() => setQuickFilter('month')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'month'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-            >
-              This Month
-            </button>
+            {(['all', 'week', 'month'] as const).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setQuickFilter(filter)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === filter
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                  }`}
+              >
+                {filter === 'all' ? 'All Time' : filter === 'week' ? 'This Week' : 'This Month'}
+              </button>
+            ))}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -314,18 +316,21 @@ const OrdersPage = () => {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="form-label">Status</label>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="form-select"
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
+            {isAdmin && (
+              <div>
+                <label className="form-label">Sales Person</label>
+                <select
+                  value={filterSalesPerson}
+                  onChange={(e) => setFilterSalesPerson(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="">All Sales Persons</option>
+                  {salesPersons.map(sp => (
+                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="form-label">From Date</label>
               <input
@@ -347,11 +352,11 @@ const OrdersPage = () => {
           </div>
         </div>
 
-        {/* Sort and Orders Table */}
+        {/* Orders Table */}
         <div className="dashboard-card overflow-hidden p-0">
           <div className="flex items-center justify-between p-4 border-b border-border">
             <span className="text-sm text-muted-foreground">
-              {filteredOrders.length} orders
+              {isLoading ? <Skeleton className="h-4 w-20" /> : `${filteredOrders.length} orders`}
             </span>
             <div className="flex items-center gap-2">
               <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
@@ -374,36 +379,74 @@ const OrdersPage = () => {
                   <th className="table-header">Date</th>
                   <th className="table-header">Campaign</th>
                   <th className="table-header">Products</th>
+                  {isAdmin && <th className="table-header">Sales Person</th>}
                   <th className="table-header text-right">Total</th>
                   <th className="table-header text-right">Commission</th>
-                  <th className="table-header">Status</th>
-                  {isAdmin && <th className="table-header">Actions</th>}
+                  {isAdmin && <th className="table-header text-center">Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.length === 0 ? (
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="table-row">
+                      <td className="table-cell"><Skeleton className="h-4 w-24" /></td>
+                      <td className="table-cell"><Skeleton className="h-4 w-32" /></td>
+                      <td className="table-cell"><Skeleton className="h-4 w-28" /></td>
+                      {isAdmin && <td className="table-cell"><Skeleton className="h-4 w-24" /></td>}
+                      <td className="table-cell"><Skeleton className="h-4 w-20 ml-auto" /></td>
+                      <td className="table-cell"><Skeleton className="h-4 w-20 ml-auto" /></td>
+                      {isAdmin && <td className="table-cell"><Skeleton className="h-4 w-16 mx-auto" /></td>}
+                    </tr>
+                  ))
+                ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin ? 7 : 6} className="table-cell text-center text-muted-foreground py-8">
+                    <td colSpan={isAdmin ? 7 : 5} className="table-cell text-center text-muted-foreground py-8">
                       No orders found
                     </td>
                   </tr>
                 ) : (
                   filteredOrders.map((order) => {
-                    const campaign = campaigns.find(c => c.id === order.campaignId);
+                    const campaign = campaignsMap.get(order.campaignId);
+                    const salesPerson = campaign ? usersMap.get(campaign.salesPersonId) : null;
 
                     return (
                       <tr
                         key={order.id}
-                        className={`table-row cursor-pointer hover:bg-secondary/70 ${order.status === 'cancelled' ? 'opacity-50' : ''}`}
-                        onClick={() => handleRowClick(order)}
+                        className="table-row cursor-pointer hover:bg-secondary/70"
+                        onClick={() => setViewingOrder(order)}
                       >
-                        <td className="table-cell">{order.createdAt}</td>
-                        <td className="table-cell font-medium">{campaign?.title}</td>
+                        <td className="table-cell">{order.createdAt.split('T')[0]}</td>
                         <td className="table-cell">
-                          <span className={order.status === 'cancelled' ? 'line-through text-muted-foreground' : ''}>
-                            {order.products.length} items
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {campaign && (
+                              campaign.platform === 'facebook'
+                                ? <Facebook className="w-4 h-4 text-[#1877F2]" />
+                                : <Instagram className="w-4 h-4 text-[#E4405F]" />
+                            )}
+                            <span className="font-medium">{campaign?.title || 'Unknown'}</span>
+                          </div>
                         </td>
+                        <td className="table-cell">
+                          <Tooltip>
+                            <TooltipTrigger className="text-left">
+                              <span className="text-sm">
+                                {formatProductsSummary(order.products)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="space-y-1">
+                                {order.products.map((p, i) => (
+                                  <p key={i}>{p.name} ×{p.qty} (RM{(p.qty * p.basePrice).toFixed(2)})</p>
+                                ))}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </td>
+                        {isAdmin && (
+                          <td className="table-cell text-sm">
+                            {salesPerson?.name || '-'}
+                          </td>
+                        )}
                         <td className="table-cell text-right font-medium">
                           RM {order.orderTotal.toFixed(2)}
                         </td>
@@ -419,31 +462,25 @@ const OrdersPage = () => {
                             </TooltipContent>
                           </Tooltip>
                         </td>
-                        <td className="table-cell">
-                          <span className={order.status === 'active' ? 'badge-active' : 'badge-inactive'}>
-                            {order.status}
-                          </span>
-                        </td>
                         {isAdmin && (
-                          <td className="table-cell">
-                            {order.status === 'active' && (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); setViewingOrder(order); setIsEditMode(true); }}
-                                  className="p-1 hover:bg-secondary rounded transition-colors"
-                                  title="Edit Order"
-                                >
-                                  <Edit2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); deleteOrder(order.id); }}
-                                  className="p-1 hover:bg-destructive/10 rounded transition-colors"
-                                  title="Delete Order"
-                                >
-                                  <Trash2 className="w-4 h-4 text-destructive" />
-                                </button>
-                              </div>
-                            )}
+                          <td className="table-cell text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                onClick={(e) => handleEditOrder(order, e)}
+                                className="p-1.5 hover:bg-secondary rounded transition-colors"
+                                title="Edit Order"
+                              >
+                                <Pencil className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                              </button>
+                              <button
+                                onClick={(e) => handleDeleteOrder(order.id, e)}
+                                className="p-1.5 hover:bg-destructive/10 rounded transition-colors"
+                                title="Delete Order"
+                                disabled={deleteOrderMutation.isPending}
+                              >
+                                <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                              </button>
+                            </div>
                           </td>
                         )}
                       </tr>
@@ -460,138 +497,23 @@ const OrdersPage = () => {
         </p>
       </div>
 
-      {/* Order Detail Modal */}
-      <Dialog open={!!viewingOrder} onOpenChange={() => { setViewingOrder(null); setIsEditMode(false); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Order Details</DialogTitle>
-          </DialogHeader>
-          {viewingOrder && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Date</p>
-                  <p className="font-medium">{viewingOrder.createdAt}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <span className={viewingOrder.status === 'active' ? 'badge-active' : 'badge-inactive'}>
-                    {viewingOrder.status}
-                  </span>
-                </div>
-              </div>
+      {/* View-only Order Detail Dialog */}
+      <OrderDetailsDialog
+        order={viewingOrder}
+        campaign={viewingOrder ? campaignsMap.get(viewingOrder.campaignId) : null}
+        salesPerson={viewingOrder ? usersMap.get(campaignsMap.get(viewingOrder.campaignId)?.salesPersonId || '') : null}
+        open={!!viewingOrder}
+        onOpenChange={(open) => !open && setViewingOrder(null)}
+      />
 
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">Products</p>
-                {isEditMode ? (
-                  <div className="space-y-2">
-                    {editProducts.map((product, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={product.name}
-                          onChange={(e) => updateEditProduct(index, 'name', e.target.value)}
-                          className="form-input flex-1 text-sm"
-                          placeholder="Product"
-                        />
-                        <input
-                          type="number"
-                          value={product.qty || ''}
-                          onChange={(e) => updateEditProduct(index, 'qty', e.target.value)}
-                          className="form-input w-14 text-sm"
-                          min="1"
-                        />
-                        <input
-                          type="number"
-                          value={product.basePrice || ''}
-                          onChange={(e) => updateEditProduct(index, 'basePrice', e.target.value)}
-                          className="form-input w-20 text-sm"
-                          step="0.01"
-                        />
-                        <button
-                          onClick={() => removeEditProductRow(index)}
-                          className="p-1 text-muted-foreground hover:text-destructive"
-                          disabled={editProducts.length === 1}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={addEditProductRow}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      + Add product
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {viewingOrder.products.map((product, index) => (
-                      <div key={index} className="flex justify-between p-2 bg-secondary/30 rounded">
-                        <span>{product.name} × {product.qty}</span>
-                        <span className="font-medium">RM {(product.basePrice * product.qty).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="border-t border-border pt-4">
-                <div className="flex justify-between mb-2">
-                  <span className="text-muted-foreground">Order Total</span>
-                  <span className="font-bold">
-                    RM {isEditMode
-                      ? editProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0).toFixed(2)
-                      : viewingOrder.orderTotal.toFixed(2)
-                    }
-                  </span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <Tooltip>
-                    <TooltipTrigger className="text-muted-foreground underline decoration-dotted">
-                      Snapshot Rate
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Rate locked at order creation time</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <span className="text-primary font-medium">{viewingOrder.snapshotRate}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Commission</span>
-                  <span className="text-success font-bold">
-                    RM {isEditMode
-                      ? (editProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0) * (viewingOrder.snapshotRate / 100)).toFixed(2)
-                      : viewingOrder.commissionAmount.toFixed(2)
-                    }
-                  </span>
-                </div>
-              </div>
-
-              {isEditMode ? (
-                <div className="flex gap-3">
-                  <button onClick={() => setIsEditMode(false)} className="btn-secondary flex-1">
-                    Cancel
-                  </button>
-                  <button onClick={handleSaveEdit} className="btn-primary flex-1">
-                    Save Changes
-                  </button>
-                </div>
-              ) : (
-                viewingOrder.status === 'active' && isAdmin && (
-                  <button
-                    onClick={() => { deleteOrder(viewingOrder.id); setViewingOrder(null); }}
-                    className="w-full text-destructive hover:bg-destructive/10 py-2 rounded-lg transition-colors text-sm font-medium"
-                  >
-                    Delete Order
-                  </button>
-                )
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Edit Order Modal */}
+      <OrderEditModal
+        order={editingOrder}
+        open={!!editingOrder}
+        onOpenChange={(open) => !open && setEditingOrder(null)}
+        onSave={(orderId, products) => updateOrderMutation.mutate({ id: orderId, products })}
+        isLoading={updateOrderMutation.isPending}
+      />
 
       {/* Add Order Modal */}
       {showAddOrder && (
@@ -607,123 +529,28 @@ const OrdersPage = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-5">
-              <div>
-                <label className="form-label">Select Campaign</label>
-                <select
-                  required
-                  value={selectedCampaignId}
-                  onChange={(e) => setSelectedCampaignId(e.target.value)}
-                  className="form-select"
-                >
-                  <option value="">Choose a campaign...</option>
-                  {activeCampaigns.map(c => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
-                {!isAdmin && activeCampaigns.length === 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    No active campaigns assigned to you
-                  </p>
-                )}
-              </div>
-
-              {linkedSalesPerson && (
-                <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">
-                  <Info className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      Sales Person: {linkedSalesPerson.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Rate: <span className="font-semibold text-primary">{linkedSalesPerson.commissionRate}%</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      This rate will be locked as snapshot rate
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="form-label mb-0">Products</label>
-                  <button type="button" onClick={addProductRow} className="btn-ghost text-xs py-1 px-2">
-                    <Plus className="w-3 h-3" /> Add Row
-                  </button>
-                </div>
-                <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-                  {products.map((product, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder="Product"
-                        value={product.name}
-                        onChange={(e) => updateProduct(index, 'name', e.target.value)}
-                        className="form-input flex-1"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Qty"
-                        min="1"
-                        value={product.qty || ''}
-                        onChange={(e) => updateProduct(index, 'qty', e.target.value)}
-                        className="form-input w-16"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Price"
-                        step="0.01"
-                        min="0"
-                        value={product.basePrice || ''}
-                        onChange={(e) => updateProduct(index, 'basePrice', e.target.value)}
-                        className="form-input w-20"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeProductRow(index)}
-                        className="p-2 text-muted-foreground hover:text-destructive transition-colors"
-                        disabled={products.length === 1}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Live Commission Preview */}
-              <div className="border border-success/30 rounded-lg p-4 bg-success/5">
-                <p className="text-xs text-muted-foreground mb-2">Commission Preview</p>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Order Total</p>
-                    <p className="text-lg font-bold text-foreground">RM {orderTotal.toFixed(2)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Est. Commission</p>
-                    <p className="text-lg font-bold text-success">RM {commissionAmount.toFixed(2)}</p>
-                  </div>
-                </div>
-                {linkedSalesPerson && (
-                  <p className="text-xs text-muted-foreground mt-2 text-center">
-                    {orderTotal.toFixed(2)} × {linkedSalesPerson.commissionRate}% = {commissionAmount.toFixed(2)}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setShowAddOrder(false)} className="btn-secondary flex-1">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary flex-1" disabled={!selectedCampaignId}>
-                  Record Order
-                </button>
-              </div>
-            </form>
+            <div className="p-6">
+              <OrderForm
+                campaigns={activeCampaigns}
+                usersMap={usersMap}
+                onSubmit={(data) => createOrderMutation.mutate(data)}
+                onCancel={() => setShowAddOrder(false)}
+                isSubmitting={createOrderMutation.isPending}
+              />
+            </div>
           </div>
         </div>
       )}
+
+      {/* Delete Order Confirmation Dialog */}
+      <ConfirmDeleteDialog
+        open={!!deleteOrderId}
+        onOpenChange={(open) => !open && setDeleteOrderId(null)}
+        title="Delete Order"
+        description="Are you sure you want to delete this order? You can undo this action within 5 seconds."
+        onConfirm={confirmDeleteOrder}
+        isLoading={false}
+      />
     </DashboardLayout>
   );
 };

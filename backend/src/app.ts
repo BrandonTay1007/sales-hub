@@ -18,8 +18,30 @@ import { errorHandler } from './middleware/errorHandler';
 const app: Express = express();
 
 // Middleware
+const allowedOrigins = [
+    process.env.FRONTEND_URL || 'http://localhost:8080',
+    'http://localhost:8081',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:8081',
+];
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+
+        // Check if origin is allowed
+        const isAllowed = allowedOrigins.includes(origin) ||
+            origin.startsWith('http://localhost:') ||
+            origin.startsWith('http://127.0.0.1:');
+
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            console.warn(`CORS blocked request from origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
 }));
 app.use(express.json());

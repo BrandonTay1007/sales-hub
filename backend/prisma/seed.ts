@@ -56,16 +56,41 @@ async function main() {
         console.log(`✅ Created sales person: ${user.username} (${sp.rate}%)`);
     }
 
-    // Create Campaigns
+    // Create Campaigns with start/end dates
+    const currentDate = new Date();
     const campaignsData = [
-        { title: 'Summer Sale 2025', platform: 'facebook' as const, type: 'post' as const },
-        { title: 'Flash Friday Deals', platform: 'instagram' as const, type: 'live' as const },
-        { title: 'Holiday Special', platform: 'facebook' as const, type: 'event' as const },
-        { title: 'New Year Promo', platform: 'instagram' as const, type: 'post' as const },
-        { title: 'Valentine Collection', platform: 'facebook' as const, type: 'live' as const },
-        { title: 'Spring Clearance', platform: 'instagram' as const, type: 'event' as const },
-        { title: 'Mother Day Gift', platform: 'facebook' as const, type: 'post' as const },
-        { title: 'Weekend Flash Sale', platform: 'instagram' as const, type: 'live' as const },
+        {
+            title: 'Summer Sale 2025', platform: 'facebook' as const, type: 'post' as const,
+            startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1), endDate: null, status: 'active' as const
+        },
+        {
+            title: 'Flash Friday Deals', platform: 'instagram' as const, type: 'live' as const,
+            startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 15), endDate: null, status: 'active' as const
+        },
+        {
+            title: 'Holiday Special', platform: 'facebook' as const, type: 'event' as const,
+            startDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1), endDate: new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 15), status: 'completed' as const
+        },
+        {
+            title: 'New Year Promo', platform: 'instagram' as const, type: 'post' as const,
+            startDate: new Date(currentDate.getFullYear(), 0, 1), endDate: new Date(currentDate.getFullYear(), 0, 31), status: 'completed' as const
+        },
+        {
+            title: 'Valentine Collection', platform: 'facebook' as const, type: 'live' as const,
+            startDate: new Date(currentDate.getFullYear(), 1, 1), endDate: new Date(currentDate.getFullYear(), 1, 14), status: 'completed' as const
+        },
+        {
+            title: 'Spring Clearance', platform: 'instagram' as const, type: 'event' as const,
+            startDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 1), endDate: null, status: 'active' as const
+        },
+        {
+            title: 'Mother Day Gift', platform: 'facebook' as const, type: 'post' as const,
+            startDate: new Date(currentDate.getFullYear(), 4, 1), endDate: new Date(currentDate.getFullYear(), 4, 15), status: 'completed' as const
+        },
+        {
+            title: 'Weekend Flash Sale', platform: 'instagram' as const, type: 'live' as const,
+            startDate: new Date(currentDate.getFullYear(), currentDate.getMonth(), 10), endDate: null, status: 'active' as const
+        },
     ];
 
     const campaigns: { id: string; salesPersonId: string; title: string }[] = [];
@@ -78,11 +103,13 @@ async function main() {
                 type: campaignsData[i].type,
                 url: `https://www.${campaignsData[i].platform}.com/post/${i + 1}`,
                 salesPersonId: salesPerson.id,
-                status: 'active',
+                status: campaignsData[i].status,
+                startDate: campaignsData[i].startDate,
+                endDate: campaignsData[i].endDate,
             },
         });
         campaigns.push(campaign);
-        console.log(`✅ Created campaign: ${campaign.title} -> ${salesPerson.username}`);
+        console.log(`✅ Created campaign: ${campaign.title} -> ${salesPerson.username} (${campaignsData[i].status})`);
     }
 
     // Create Orders across multiple months
@@ -131,6 +158,36 @@ async function main() {
                 orderCount++;
             }
         }
+    }
+
+    // Create orders for the previous year (to differentiate YTD from All Time)
+    const lastYear = now.getFullYear() - 1;
+    console.log(`Adding orders for ${lastYear}...`);
+
+    for (let i = 0; i < 20; i++) {
+        const orderDate = new Date(lastYear, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1);
+        const campaign = campaigns[Math.floor(Math.random() * campaigns.length)];
+        const productSet = products[Math.floor(Math.random() * products.length)];
+        const orderTotal = productSet.reduce((sum, p) => sum + (p.qty * p.basePrice), 0);
+
+        const salesPerson = salesPersons.find(sp =>
+            campaigns.find(c => c.id === campaign.id)?.salesPersonId === sp.id
+        );
+        const snapshotRate = salesPerson?.commissionRate || 10;
+        const commissionAmount = orderTotal * (snapshotRate / 100);
+
+        await prisma.order.create({
+            data: {
+                campaignId: campaign.id,
+                products: productSet,
+                orderTotal,
+                snapshotRate,
+                commissionAmount,
+                status: 'active',
+                createdAt: orderDate,
+            },
+        });
+        orderCount++;
     }
 
     console.log(`✅ Created ${orderCount} orders across 3 months`);

@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Report: Session Persistence Fix</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 2rem; background: #1a1a2e; color: #eee; }
+        h1 { color: #a78bfa; border-bottom: 2px solid #a78bfa; padding-bottom: 0.5rem; }
+        h2 { color: #8b5cf6; margin-top: 2rem; }
+        .status-pass { color: #22c55e; font-weight: bold; }
+        .status-warn { color: #eab308; font-weight: bold; }
+        .status-fail { color: #ef4444; font-weight: bold; }
+        .meta { background: #2d2d44; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; }
+        .meta p { margin: 0.25rem 0; }
+        .section { background: #2d2d44; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+        code { background: #3d3d5c; padding: 0.2rem 0.5rem; border-radius: 4px; }
+        ul { padding-left: 1.5rem; }
+        li { margin: 0.5rem 0; }
+        hr { border: none; border-top: 1px solid #3d3d5c; margin: 2rem 0; }
+    </style>
+</head>
+<body>
+    <h1>Verification Report: Session Persistence Fix</h1>
+    
+    <div class="meta">
+        <p><strong>Spec:</strong> <code>2025-12-21-session-persistence-fix</code></p>
+        <p><strong>Date:</strong> 2025-12-21</p>
+        <p><strong>Verifier:</strong> implementation-verifier</p>
+        <p><strong>Status:</strong> <span class="status-warn">⚠️ Passed with Issues</span></p>
+    </div>
+
+    <hr>
+
+    <h2>Executive Summary</h2>
+    <div class="section">
+        <p>The session persistence fix has been successfully implemented. Sales persons will no longer trigger 403 errors when accessing Campaigns and Orders pages. The fix adds conditional data fetching using React Query's <code>enabled</code> option. Build verification passed. Manual browser testing is still required to confirm full functionality.</p>
+    </div>
+
+    <hr>
+
+    <h2>1. Tasks Verification</h2>
+    <div class="section">
+        <p><strong>Status:</strong> <span class="status-warn">⚠️ Partial - Manual Testing Pending</span></p>
+        
+        <h3>Completed Tasks</h3>
+        <ul>
+            <li>✅ 1.1 Fix CampaignsPage.tsx - Added <code>enabled: isAdmin</code> to users query</li>
+            <li>✅ 1.2 Fix OrdersPage.tsx - Added <code>enabled: isAdmin</code> to users query + updated isLoading logic</li>
+            <li>✅ 1.5 Build verification - <code>npm run build</code> passed (exit code 0)</li>
+        </ul>
+
+        <h3>Pending Tasks (Require Manual Testing)</h3>
+        <ul>
+            <li>⏳ 1.3 Verify fix works - Login as sales person, navigate to pages, refresh</li>
+            <li>⏳ 1.4 Verify admin still works - Login as admin, navigate to pages, refresh</li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <h2>2. Documentation Verification</h2>
+    <div class="section">
+        <p><strong>Status:</strong> <span class="status-pass">✅ Complete</span></p>
+        
+        <h3>Spec Documentation</h3>
+        <ul>
+            <li>✅ <code>planning/requirements.md</code> - Requirements gathered</li>
+            <li>✅ <code>spec.md</code> - Technical specification</li>
+            <li>✅ <code>tasks.md</code> - Task breakdown (updated with completion status)</li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <h2>3. Roadmap Updates</h2>
+    <div class="section">
+        <p><strong>Status:</strong> <span class="status-warn">⚠️ No Updates Needed</span></p>
+        <p>This is a bug fix, not a roadmap feature. No roadmap items correspond to this implementation.</p>
+    </div>
+
+    <hr>
+
+    <h2>4. Test Suite Results</h2>
+    <div class="section">
+        <p><strong>Status:</strong> <span class="status-warn">⚠️ Pre-existing Issues</span></p>
+        
+        <h3>Test Summary</h3>
+        <ul>
+            <li><strong>Frontend Build:</strong> ✅ Passed (no TypeScript errors)</li>
+            <li><strong>Backend Tests:</strong> ❌ Could not run - pre-existing @types/jest missing</li>
+        </ul>
+
+        <h3>Notes</h3>
+        <p>The backend test suite has a pre-existing TypeScript configuration issue (<code>Cannot find name 'describe'</code>). This is unrelated to the frontend session persistence fix. The fix is frontend-only and does not affect backend functionality.</p>
+    </div>
+
+    <hr>
+
+    <h2>5. Changes Made</h2>
+    <div class="section">
+        <h3>CampaignsPage.tsx</h3>
+        <ul>
+            <li>Added <code>enabled: isAdmin</code> to users useQuery hook</li>
+            <li>Added fallback to <code>campaign.salesPerson</code> when usersMap is empty</li>
+        </ul>
+
+        <h3>OrdersPage.tsx</h3>
+        <ul>
+            <li>Added <code>enabled: isAdmin</code> to users useQuery hook</li>
+            <li>Updated <code>isLoading</code> to not depend on usersLoading for sales persons</li>
+        </ul>
+    </div>
+</body>
+</html>

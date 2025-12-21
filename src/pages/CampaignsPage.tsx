@@ -1,18 +1,30 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { campaigns as initialCampaigns, users, Campaign, getCampaignRevenue, orders as initialOrders, Order } from '@/lib/mockData';
+import { campaignsApi, usersApi, ordersApi, type Campaign, type User, getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Facebook, Instagram, Edit2, ExternalLink, Lock, Filter, Trash2 } from 'lucide-react';
+import { Plus, Facebook, Instagram, Edit2, ExternalLink, Lock, Filter, Trash2, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
-import { CampaignEditModal, CampaignFormData } from '@/components/CampaignEditModal';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { StopCircle, RefreshCcw } from 'lucide-react';
+import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
+
+interface CampaignFormData {
+  title: string;
+  platform: 'facebook' | 'instagram';
+  type: 'post' | 'live' | 'event';
+  url: string;
+  salesPersonId: string;
+  startDate?: string;
+}
 
 const CampaignsPage = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, isAdmin } = useAuth();
-  const [campaigns, setCampaigns] = useState<Campaign[]>(initialCampaigns);
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,39 +38,144 @@ const CampaignsPage = () => {
   const [filterDateTo, setFilterDateTo] = useState('');
   const [quickFilter, setQuickFilter] = useState<'all' | 'week' | 'month'>('all');
 
-  const salesUsers = users.filter(u => u.role === 'sales');
+  // Delete confirmation state
+  const [deleteCampaignId, setDeleteCampaignId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null);
 
-  // Available campaigns based on role (for filtering logic)
-  const availableCampaigns = isAdmin
-    ? campaigns
-    : campaigns.filter(c => c.assignedSalesPersonId === user?.id);
+  // Fetch campaigns
+  const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: async () => {
+      const response = await campaignsApi.list();
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+  });
 
+  // Fetch users for sales person filter and display
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const response = await usersApi.list();
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+    enabled: isAdmin, // Only fetch for admin - sales persons get 403
+  });
+
+  // Fetch orders for revenue calculation
+  const { data: orders = [] } = useQuery({
+    queryKey: ['orders'],
+    queryFn: async () => {
+      const response = await ordersApi.list();
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+  });
+
+  const salesUsers = allUsers.filter(u => u.role === 'sales');
+
+  // Create campaign mutation
+  const createMutation = useMutation({
+    mutationFn: async (data: CampaignFormData) => {
+      const response = await campaignsApi.create({
+        title: data.title,
+        platform: data.platform,
+        type: data.type,
+        url: data.url,
+        salesPersonId: data.salesPersonId,
+        startDate: data.startDate,
+      });
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      setIsModalOpen(false);
+      toast.success('Campaign created successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to create campaign', { description: error.message });
+    },
+  });
+
+  // Update campaign mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<CampaignFormData> }) => {
+      const response = await campaignsApi.update(id, {
+        title: data.title,
+        platform: data.platform,
+        type: data.type,
+        url: data.url,
+        startDate: data.startDate,
+      });
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      setIsModalOpen(false);
+      setEditingCampaign(null);
+      toast.success('Campaign updated successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update campaign', { description: error.message });
+    },
+  });
+
+  // Delete campaign mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await campaignsApi.delete(id);
+      if (!response.success) throw new Error(getErrorMessage(response));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      toast.success('Campaign deleted');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete campaign', { description: error.message });
+    },
+  });
+
+  // Calculate campaign revenue from orders
+  const getCampaignRevenue = (campaignId: string) => {
+    return orders
+      .filter(o => o.campaignId === campaignId)
+      .reduce((sum, o) => sum + o.orderTotal, 0);
+  };
+
+  // Filter logic
   const filteredCampaigns = useMemo(() => {
-    let filtered = availableCampaigns;
+    // Role-based filtering: sales sees only their campaigns
+    let filtered = isAdmin
+      ? campaigns
+      : campaigns.filter(c => c.salesPersonId === user?.id);
 
     // Quick Filters
     if (quickFilter === 'week') {
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
       const weekAgoStr = weekAgo.toISOString().split('T')[0];
-      filtered = filtered.filter(c => (c.startDate || c.createdAt) >= weekAgoStr);
+      filtered = filtered.filter(c => c.createdAt >= weekAgoStr);
     } else if (quickFilter === 'month') {
-      const monthPrefix = new Date().toISOString().slice(0, 7); // 2025-12
-      filtered = filtered.filter(c => (c.startDate || c.createdAt).startsWith(monthPrefix));
+      const monthPrefix = new Date().toISOString().slice(0, 7);
+      filtered = filtered.filter(c => c.createdAt.startsWith(monthPrefix));
     }
 
     // Explicit Filters
     filtered = filtered.filter(campaign => {
-      if (filterSalesPerson && campaign.assignedSalesPersonId !== filterSalesPerson) return false;
+      if (filterSalesPerson && campaign.salesPersonId !== filterSalesPerson) return false;
       if (filterPlatform && campaign.platform !== filterPlatform) return false;
       if (filterStatus && campaign.status !== filterStatus) return false;
-      if (filterDateFrom && (campaign.startDate || campaign.createdAt) < filterDateFrom) return false;
-      if (filterDateTo && (campaign.startDate || campaign.createdAt) > filterDateTo) return false;
+      if (filterDateFrom && campaign.createdAt < filterDateFrom) return false;
+      if (filterDateTo && campaign.createdAt > filterDateTo) return false;
       return true;
     });
 
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [availableCampaigns, filterSalesPerson, filterPlatform, filterStatus, filterDateFrom, filterDateTo, quickFilter]);
+  }, [campaigns, isAdmin, user?.id, filterSalesPerson, filterPlatform, filterStatus, filterDateFrom, filterDateTo, quickFilter]);
 
   const clearFilters = () => {
     setFilterSalesPerson('');
@@ -87,75 +204,59 @@ const CampaignsPage = () => {
     setEditingCampaign(null);
   };
 
-  const handleModalSubmit = (data: CampaignFormData) => {
+  const handleModalSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const startDateValue = formData.get('startDate') as string;
+    const data: CampaignFormData = {
+      title: formData.get('title') as string,
+      platform: formData.get('platform') as 'facebook' | 'instagram',
+      type: formData.get('type') as 'post' | 'live' | 'event',
+      url: formData.get('url') as string,
+      salesPersonId: formData.get('salesPersonId') as string || editingCampaign?.salesPersonId || '',
+      startDate: startDateValue || undefined,
+    };
+
     if (editingCampaign) {
-      // Update
-      setCampaigns(campaigns.map(c =>
-        c.id === editingCampaign.id
-          ? {
-            ...c,
-            ...data,
-            assignedSalesPersonId: data.assignedSalesPersonId, // Explicitly update this
-            startDate: data.startDate || undefined,
-            endDate: data.endDate || undefined,
-          }
-          : c
-      ));
-      toast.success('Campaign updated successfully!');
+      updateMutation.mutate({ id: editingCampaign.id, data });
     } else {
-      // Create
-      const newCampaign: Campaign = {
-        id: String(campaigns.length + 1),
-        ...data,
-        status: 'active',
-        createdAt: new Date().toISOString().split('T')[0],
-        startDate: data.startDate || new Date().toISOString().split('T')[0],
-        endDate: data.endDate || undefined,
-      };
-      setCampaigns([...campaigns, newCampaign]);
-      toast.success('Campaign created successfully!');
+      createMutation.mutate(data);
     }
-    closeModal();
-  };
-
-  const handleEndCampaign = () => {
-    if (!editingCampaign) return;
-
-    setCampaigns(campaigns.map(c =>
-      c.id === editingCampaign.id
-        ? { ...c, status: 'completed' as const, endDate: new Date().toISOString().split('T')[0] }
-        : c
-    ));
-    toast.success('Campaign ended successfully!');
-    closeModal();
   };
 
   const deleteCampaign = (campaignId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    const campaignToDelete = campaigns.find(c => c.id === campaignId);
-    if (!campaignToDelete) return;
+    setDeleteCampaignId(campaignId);
+  };
 
-    // Find related orders
-    const relatedOrders = orders.filter(o => o.campaignId === campaignId);
+  const confirmDeleteCampaign = () => {
+    if (!deleteCampaignId) return;
+    const campaignId = deleteCampaignId;
+    setDeleteCampaignId(null);
 
-    // Remove campaign and related orders
-    setCampaigns(prev => prev.filter(c => c.id !== campaignId));
-    setOrders(prev => prev.filter(o => o.campaignId !== campaignId));
-
-    toast.success('Campaign deleted', {
-      description: `Campaign and ${relatedOrders.length} related orders removed`,
-      duration: 5000,
+    // Show undo toast with 5-second window
+    const toastId = toast.success('Campaign deleted', {
       action: {
         label: 'Undo',
         onClick: () => {
-          setCampaigns(prev => [...prev, campaignToDelete].sort((a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          ));
-          setOrders(prev => [...prev, ...relatedOrders]);
-          toast.success('Campaign and orders restored');
+          if (pendingDelete?.timer) {
+            clearTimeout(pendingDelete.timer);
+            setPendingDelete(null);
+            toast.dismiss(toastId);
+            toast.info('Deletion cancelled');
+          }
         },
       },
+      duration: 5000,
     });
+
+    // Set timeout for actual deletion after 5 seconds
+    const timer = setTimeout(() => {
+      deleteMutation.mutate(campaignId);
+      setPendingDelete(null);
+    }, 5000);
+
+    setPendingDelete({ id: campaignId, timer });
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -166,17 +267,15 @@ const CampaignsPage = () => {
     );
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active': return 'badge-active';
-      case 'paused': return 'badge-paused';
-      default: return 'badge-inactive';
-    }
-  };
-
   const handleRowClick = (campaignId: string) => {
     navigate(`/campaigns/${campaignId}`);
   };
+
+  const getAvatar = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const isLoading = campaignsLoading;
 
   return (
     <DashboardLayout>
@@ -280,7 +379,6 @@ const CampaignsPage = () => {
               >
                 <option value="">All Status</option>
                 <option value="active">Active</option>
-                <option value="paused">Paused</option>
                 <option value="completed">Completed</option>
               </select>
             </div>
@@ -315,30 +413,48 @@ const CampaignsPage = () => {
             <table className="w-full">
               <thead className="bg-secondary/50">
                 <tr>
-                  <th className="table-header">Status</th>
                   <th className="table-header">Title</th>
                   <th className="table-header">Sales Person</th>
                   <th className="table-header">Platform</th>
+                  <th className="table-header">Type</th>
+                  <th className="table-header">Status</th>
                   <th className="table-header">Period</th>
                   <th className="table-header text-right">Revenue</th>
                   <th className="table-header">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredCampaigns.length === 0 ? (
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="table-row">
+                      <td className="table-cell"><Skeleton className="h-4 w-32" /></td>
+                      <td className="table-cell">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="w-6 h-6 rounded-full" />
+                          <Skeleton className="h-4 w-20" />
+                        </div>
+                      </td>
+                      <td className="table-cell"><Skeleton className="h-4 w-16" /></td>
+                      <td className="table-cell"><Skeleton className="h-4 w-12" /></td>
+                      <td className="table-cell"><Skeleton className="h-5 w-14" /></td>
+                      <td className="table-cell"><Skeleton className="h-4 w-24" /></td>
+                      <td className="table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                      <td className="table-cell"><Skeleton className="h-6 w-16" /></td>
+                    </tr>
+                  ))
+                ) : filteredCampaigns.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="table-cell text-center text-muted-foreground py-8">
+                    <td colSpan={8} className="table-cell text-center text-muted-foreground py-8">
                       {isAdmin
                         ? (hasFilters ? 'No campaigns match your filters' : 'No campaigns found')
-                        : (hasFilters ? 'No campaigns match your filters' : 'No campaigns assigned to you yet')
-                      }
+                        : (hasFilters ? 'No campaigns match your filters' : 'No campaigns assigned to you yet')}
                     </td>
                   </tr>
                 ) : (
                   filteredCampaigns.map((campaign) => {
-                    const salesPerson = users.find(u => u.id === campaign.assignedSalesPersonId);
+                    const salesPerson = allUsers.find(u => u.id === campaign.salesPersonId) || campaign.salesPerson;
                     const revenue = getCampaignRevenue(campaign.id);
-                    const isOwner = campaign.assignedSalesPersonId === user?.id;
+                    const isOwner = campaign.salesPersonId === user?.id;
 
                     return (
                       <tr
@@ -346,16 +462,11 @@ const CampaignsPage = () => {
                         className="table-row cursor-pointer hover:bg-secondary/70"
                         onClick={() => handleRowClick(campaign.id)}
                       >
-                        <td className="table-cell">
-                          <span className={getStatusBadge(campaign.status)}>
-                            {campaign.status}
-                          </span>
-                        </td>
                         <td className="table-cell font-medium">{campaign.title}</td>
                         <td className="table-cell">
                           <div className="flex items-center gap-2">
                             <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                              {salesPerson?.avatar}
+                              {salesPerson ? getAvatar(salesPerson.name) : '?'}
                             </div>
                             <span>{salesPerson?.name || '-'}</span>
                             {isOwner && !isAdmin && (
@@ -369,13 +480,19 @@ const CampaignsPage = () => {
                             <span className="capitalize">{campaign.platform}</span>
                           </div>
                         </td>
+                        <td className="table-cell capitalize">{campaign.type}</td>
+                        <td className="table-cell">
+                          <span className={campaign.status === 'active' ? 'badge-active' : 'badge-inactive'}>
+                            {campaign.status}
+                          </span>
+                        </td>
                         <td className="table-cell text-sm text-muted-foreground">
-                          {campaign.startDate && (
+                          {campaign.startDate ? (
                             <span>
-                              {campaign.startDate}
-                              {campaign.endDate ? ` - ${campaign.endDate}` : ' - ongoing'}
+                              {campaign.startDate.split('T')[0]}
+                              {campaign.endDate ? ` - ${campaign.endDate.split('T')[0]}` : ' - ongoing'}
                             </span>
-                          )}
+                          ) : '-'}
                         </td>
                         <td className="table-cell text-right font-semibold text-foreground">
                           RM {revenue.toFixed(2)}
@@ -395,6 +512,7 @@ const CampaignsPage = () => {
                                   className="p-1.5 hover:bg-destructive/10 rounded transition-colors"
                                   onClick={(e) => deleteCampaign(campaign.id, e)}
                                   title="Delete Campaign"
+                                  disabled={deleteMutation.isPending}
                                 >
                                   <Trash2 className="w-4 h-4 text-destructive" />
                                 </button>
@@ -435,13 +553,133 @@ const CampaignsPage = () => {
         </p>
       </div>
 
-      <CampaignEditModal
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-        onSubmit={handleModalSubmit}
-        onEndCampaign={handleEndCampaign}
-        campaign={editingCampaign}
-        isCreation={!editingCampaign}
+      {/* Campaign Create/Edit Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingCampaign ? 'Edit Campaign' : 'Create Campaign'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleModalSubmit} className="space-y-4">
+            <div>
+              <label className="form-label">Title</label>
+              <input
+                type="text"
+                name="title"
+                required
+                defaultValue={editingCampaign?.title || ''}
+                className="form-input"
+                placeholder="Summer Sale 2025"
+                key={editingCampaign?.id || 'new'}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="form-label">Platform</label>
+                <select
+                  name="platform"
+                  defaultValue={editingCampaign?.platform || 'facebook'}
+                  className="form-select"
+                  key={`platform-${editingCampaign?.id || 'new'}`}
+                >
+                  <option value="facebook">Facebook</option>
+                  <option value="instagram">Instagram</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Type</label>
+                <select
+                  name="type"
+                  defaultValue={editingCampaign?.type || 'post'}
+                  className="form-select"
+                  key={`type-${editingCampaign?.id || 'new'}`}
+                >
+                  <option value="post">Post</option>
+                  <option value="live">Live</option>
+                  <option value="event">Event</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="form-label">URL</label>
+              <input
+                type="text"
+                name="url"
+                required
+                defaultValue={editingCampaign?.url || ''}
+                className="form-input"
+                placeholder="https://..."
+                key={`url-${editingCampaign?.id || 'new'}`}
+              />
+            </div>
+
+            <div>
+              <label className="form-label">Assigned Sales Person</label>
+              {!editingCampaign ? (
+                <select
+                  name="salesPersonId"
+                  required
+                  defaultValue=""
+                  className="form-select"
+                >
+                  <option value="">Select...</option>
+                  {salesUsers.filter(u => u.status === 'active').map(user => (
+                    <option key={user.id} value={user.id}>{user.name} ({user.commissionRate}%)</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="form-input bg-muted/50 cursor-not-allowed text-muted-foreground flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                    {editingCampaign.salesPerson ? getAvatar(editingCampaign.salesPerson.name) : '?'}
+                  </div>
+                  <span>{editingCampaign.salesPerson?.name || 'Unknown'}</span>
+                  <span className="text-xs ml-auto">Cannot be changed</span>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="form-label">Start Date</label>
+              <input
+                type="date"
+                name="startDate"
+                required
+                defaultValue={editingCampaign?.startDate?.split('T')[0] || new Date().toISOString().split('T')[0]}
+                className="form-input"
+                key={`startDate-${editingCampaign?.id || 'new'}`}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={closeModal} className="btn-secondary flex-1">
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-primary flex-1"
+                disabled={createMutation.isPending || updateMutation.isPending}
+              >
+                {(createMutation.isPending || updateMutation.isPending) ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {editingCampaign ? 'Saving...' : 'Creating...'}
+                  </span>
+                ) : (
+                  editingCampaign ? 'Save Changes' : 'Create Campaign'
+                )}
+              </button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Campaign Confirmation Dialog */}
+      <ConfirmDeleteDialog
+        open={!!deleteCampaignId}
+        onOpenChange={(open) => !open && setDeleteCampaignId(null)}
+        title="Delete Campaign"
+        description="Are you sure you want to delete this campaign? All orders in this campaign will also be deleted. You can undo this action within 5 seconds."
+        onConfirm={confirmDeleteCampaign}
+        isLoading={false}
       />
     </DashboardLayout>
   );

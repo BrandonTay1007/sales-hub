@@ -1,219 +1,213 @@
-# Tasks: Frontend Integration
+# Task Breakdown: Frontend Integration
 
-> Spec: `agent-os/specs/2025-12-20-frontend-integration/spec.md`
+## Overview
+Total Tasks: 4 Task Groups with 20+ sub-tasks
 
----
+## Task List
 
-## Phase 1: Foundation Setup
+### Core Infrastructure
 
-### Task 1: Environment Configuration
-**Priority:** P0 (Blocker)
+#### Task Group 1: API Client & Auth Setup
+**Dependencies:** Backend API running at localhost:3000
 
-- [ ] Create `src/.env` with `VITE_API_URL=http://localhost:3000/api`
-- [ ] Create `src/.env.example` as reference template
-- [ ] Verify Vite picks up the environment variable
-- [ ] Update `agent-os/product/tech-stack.md` to reflect native fetch (not axios)
+- [x] 1.0 Complete core infrastructure ✅
+  - [x] 1.1 Create environment configuration
+    - Create `.env` with `VITE_API_URL=http://localhost:3000/api`
+    - Create `.env.example` for reference
+  - [x] 1.2 Create API client (`src/lib/api.ts`)
+    - Native fetch wrapper with base URL from env
+    - Auto-attach Authorization header from localStorage
+    - Handle JSON request/response parsing
+    - On 401: clear token + redirect to login
+    - Export typed functions for each endpoint group
+  - [x] 1.3 Refactor AuthContext.tsx for real API
+    - Async login via `/api/auth/login`
+    - Store JWT token in localStorage on success
+    - Add `GET /api/auth/me` call to verify token on app load
+    - Add loading state for initial auth check
+    - Add full-page loading spinner during verification
+  - [x] 1.4 Add ErrorBoundary component
+    - Create ErrorBoundary wrapper in `App.tsx`
+    - Configure global error toast via Sonner
+  - [x] 1.5 Verify Task Group 1 works
+    - Login/logout works with real backend
+    - Token persists across page refresh
+    - Error states display correctly
 
----
-
-### Task 2: API Client Service
-**Priority:** P0 (Core)
-
-- [ ] Create `src/lib/api.ts` with native fetch wrapper
-- [ ] Implement `getAuthToken()` to read from localStorage
-- [ ] Implement `setAuthToken(token)` and `clearAuthToken()`
-- [ ] Create base `request()` function with:
-  - Base URL from `import.meta.env.VITE_API_URL`
-  - Authorization header injection
-  - JSON parsing for request/response
-  - 401 handling (clear token, redirect to login)
-- [ ] Create typed endpoint functions:
-  - `authApi.login()`, `authApi.logout()`, `authApi.me()`
-  - `usersApi.list()`, `usersApi.get()`, `usersApi.create()`, `usersApi.update()`, `usersApi.delete()`
-  - `campaignsApi.list()`, `campaignsApi.get()`, `campaignsApi.create()`, `campaignsApi.update()`, `campaignsApi.delete()`
-  - `ordersApi.list()`, `ordersApi.get()`, `ordersApi.create()`, `ordersApi.update()`, `ordersApi.delete()`
-  - `payoutsApi.getMyPayout()`, `payoutsApi.getTeamPayouts()`
-
----
-
-### Task 3: TypeScript Types for API
-**Priority:** P0 (Core)
-
-- [ ] Create `src/types/api.ts` with response types matching backend
-- [ ] Define `ApiResponse<T>` wrapper type
-- [ ] Define `ApiError` type for error responses
-- [ ] Ensure types align with existing mockData.ts interfaces
-- [ ] Add proper typing for payout response structures
+**Acceptance Criteria:**
+- Login with real credentials works
+- Token stored in localStorage
+- 401 errors redirect to login
+- App shows loading spinner during auth check
 
 ---
 
-## Phase 2: Authentication Integration
+### Data Management Pages
 
-### Task 4: AuthContext Refactor
-**Priority:** P0 (Core)
+#### Task Group 2: Users, Campaigns, Campaign Detail
+**Dependencies:** Task Group 1
 
-- [ ] Refactor `src/contexts/AuthContext.tsx`:
-  - Change `login()` from sync to async (returns Promise)
-  - Call `authApi.login()` instead of mock user lookup
-  - Store token in localStorage on success
-  - Add `loading` state for initial auth check
-  - Add `checkAuth()` function that calls `/api/auth/me`
-- [ ] Update `AuthContextType` interface for async login
-- [ ] Add token restoration on app load (useEffect)
-- [ ] Handle token expiry gracefully
+- [x] 2.0 Complete data management pages ✅
+  - [x] 2.1 Integrate UsersPage.tsx
+    - Replace mockData with `useQuery` for user list
+    - Implement `useMutation` for create/update/delete
+    - Add loading skeletons while fetching
+    - Show Sonner toast on success/error
+  - [x] 2.2 Integrate CampaignsPage.tsx
+    - Replace mockData with `useQuery` for campaign list
+    - Admin sees all, Sales sees only assigned
+    - Implement `useMutation` for create/update/delete
+    - Add loading skeletons
+    - [ ] **Restore campaign status column** (active/completed badge) - *Separate agent*
+    - [ ] **Restore status filter** dropdown - *Separate agent*
+  - [x] 2.3 Integrate CampaignDetailPage.tsx
+    - Fetch single campaign via `/api/campaigns/:id`
+    - Fetch orders via `/api/orders?campaignId=:id`
+    - Implement create/update/delete order mutations
+    - Add loading states
+    - [x] **Add campaign type badge** in header (Post/Live/Event) ✅
+  - [x] 2.4 Verify Task Group 2 works
+    - CRUD operations work for users (admin only)
+    - CRUD operations work for campaigns
+    - Campaign detail page loads real data
+    - [ ] Status filter and column display correctly - *Separate agent*
 
----
-
-### Task 5: Login Page Updates
-**Priority:** P0 (Core)
-
-- [ ] Update `src/pages/Login.tsx`:
-  - Convert `handleSubmit` to async
-  - Add loading state during login request
-  - Show API error messages instead of hardcoded text
-  - Remove demo user hint or update for real credentials
-- [ ] Add loading spinner on submit button
-
----
-
-### Task 6: Full-Page Loading State
-**Priority:** P1 (Polish)
-
-- [ ] Create `src/components/FullPageLoader.tsx`
-- [ ] Show loading spinner while checking auth on app load
-- [ ] Add to App.tsx to wrap routes during initial auth check
-
----
-
-### Task 7: Error Boundary
-**Priority:** P1 (Polish)
-
-- [ ] Create `src/components/ErrorBoundary.tsx`
-- [ ] Wrap App routes with ErrorBoundary
-- [ ] Show user-friendly error screen on crashes
-- [ ] Add "Try Again" button to reload
+**Acceptance Criteria:**
+- Users CRUD works (admin only)
+- Campaigns CRUD works with role-based access
+- Campaign detail shows real orders
+- Loading skeletons display during fetch
 
 ---
 
-## Phase 3: Page Integrations
+### Orders & Payouts
 
-### Task 8: Dashboard Integration
-**Priority:** P1 (Core)
+#### Task Group 3: Orders, Payouts, Team Payouts
+**Dependencies:** Task Group 2
 
-- [ ] Update `src/pages/Dashboard.tsx`:
-  - Fetch real data for stats cards
-  - Use React Query for data fetching
-  - Calculate totals from real API data
-- [ ] Add loading skeletons
+- [x] 3.0 Complete orders & payouts pages ✅
+  - [x] 3.1 Integrate OrdersPage.tsx
+    - Replace mockData with `useQuery` for orders
+    - Filter params: campaignId, startDate, endDate
+    - Implement CRUD mutations (admin only)
+    - Preserve existing filter/sort UI
+    - Add loading skeletons
+  - [x] 3.2 Add editable order date field
+    - Add date picker to create order form (default: today)
+    - Add date picker to edit order form
+    - Apply to both OrdersPage and CampaignDetailPage (via shared OrderForm)
+  - [x] 3.3 Improve products column display
+    - Show product summary instead of "X items"
+    - Format: "ProductA ×2 + 1 more"
+    - Tooltip shows full product list
+  - [x] 3.4 Enhance order details dialog
+    - Add platform icon + name (Facebook/Instagram)
+    - Add campaign type badge (Post/Live/Event)
+    - Add sales person name + commission rate
+    - Campaign title is display-only (receipt style)
+    - Created shared OrderDetailsDialog component
+  - [x] 3.5 Integrate PayoutsPage.tsx
+    - Replace mockData with API calls
+    - Uses ordersApi + campaignsApi (calculates locally)
+    - Add loading skeletons
+  - [x] 3.6 Integrate TeamPayoutsPage.tsx
+    - Replace mockData with API calls
+    - Uses ordersApi + campaignsApi + usersApi (calculates locally)
+    - Add loading skeletons
+  - [x] 3.7 Verify Task Group 3 works ✅
+    - Orders page shows real data with filters working
+    - Order date editing works
+    - Products display improved
+    - Order dialog shows campaign context
+    - Sales person sees correct payout data
+    - Admin sees team payout data
 
----
-
-### Task 9: Users Page Integration
-**Priority:** P0 (Core)
-
-- [ ] Update `src/pages/UsersPage.tsx`:
-  - Replace mockData import with `usersApi` calls
-  - Use `useQuery` for fetching user list
-  - Use `useMutation` for create/update/delete
-  - Show Sonner toast on success/error
-  - Add loading skeletons while fetching
-- [ ] Handle admin-only access check
-
----
-
-### Task 10: Campaigns Page Integration
-**Priority:** P0 (Core)
-
-- [ ] Update `src/pages/CampaignsPage.tsx`:
-  - Replace mockData with `campaignsApi` calls
-  - Use React Query with proper cache invalidation
-  - Fetch user data for sales person names
-- [ ] Update `src/pages/CampaignDetailPage.tsx`:
-  - Fetch campaign details from API
-  - Fetch orders for this campaign
-  - Show real stats
-
----
-
-### Task 11: Orders Page Integration
-**Priority:** P0 (Core)
-
-- [ ] Update `src/pages/OrdersPage.tsx`:
-  - Replace mockData with `ordersApi` calls
-  - Pass filter params (campaignId, startDate, endDate) to API
-  - Use React Query for fetching
-  - Commission calculation from API response (not frontend)
-- [ ] Add date range picker component for filtering
-- [ ] Preserve existing sort/filter UI patterns
+**Acceptance Criteria:**
+- Orders display with working filters
+- Order CRUD works (admin only)
+- Sales person payouts show correct data
+- Admin team payouts show all sales persons
 
 ---
 
-### Task 12: Payouts Page Integration
-**Priority:** P0 (Core)
+### Dashboard & Analytics
 
-- [ ] Update `src/pages/PayoutsPage.tsx`:
-  - Fetch from `/api/payouts/me` with year/month params
-  - Use React Query for data fetching
-  - Display campaign breakdown from API response
-- [ ] Update `src/pages/TeamPayoutsPage.tsx`:
-  - Fetch from `/api/payouts/team`
-  - Show all sales persons' payouts
-  - Use existing year/month selectors
+#### Task Group 4: Dashboard, Analytics, New Leaderboard
+**Dependencies:** Task Group 3
+
+- [x] 4.0 Complete dashboard & analytics pages ✅
+  - [x] 4.1 Integrate Dashboard.tsx ✅
+    - Fetch orders + campaigns from API
+    - Calculate stats in frontend:
+      - Total revenue (sum orderTotal for current month)
+      - Commissions (sum commissionAmount)
+      - Active campaigns count
+      - Daily sales (group by createdAt)
+      - Platform revenue (sum by campaign platform)
+      - Top performer (calculate per-user totals)
+    - Add loading states
+  - [x] 4.2 Integrate AnalyticsPage.tsx ✅
+    - Fetch data from API
+    - Calculate in frontend:
+      - Leaderboard (sales person)
+      - Revenue by type
+      - Top products
+      - Cumulative revenue
+    - Add loading states
+  - [x] 4.3 Create new LeaderboardPage.tsx [UI CHANGE] ✅ *Completed by parallel agent*
+    - Create new page component
+    - Add route `/analytics/leaderboard` in `App.tsx`
+    - Add toggle switch (Sales Person / Campaign view)
+    - Sales Person view: rank, avatar, name, orders, revenue, commission
+    - Campaign view: rank, title, revenue, sales person, platform
+    - Campaign rows click → navigate to CampaignDetailPage
+  - [x] 4.4 Update AnalyticsPage "See More" button ✅ *Completed by parallel agent*
+    - Change from modal to navigate to `/analytics/leaderboard`
+  - [x] 4.5 Verify Task Group 4 works ✅
+    - Dashboard shows real calculated stats
+    - Analytics shows real calculated data
+    - Leaderboard toggle works correctly
+    - Campaign rows navigate to detail page
+  - [x] 4.6 Integrate LeaderboardPage.tsx with real data & add filters [USER REQUEST] ✅
+    - Fetch orders + campaigns + users from API
+    - Add Month / YTD / All Time filter toggle
+    - Calculate leaderboards based on selected time period
+    - Remove mock data usage
+    - Add loading states
+
+**Acceptance Criteria:**
+- Dashboard stats are calculated from real API data
+- Analytics charts use real data
+- New leaderboard page exists at /analytics/leaderboard
+- Toggle between Sales Person and Campaign views works
+- "See More" navigates to leaderboard page
 
 ---
 
-## Phase 4: Polish & Testing
+## Final Verification
 
-### Task 13: React Query Hooks Layer
-**Priority:** P1 (Refactor)
+- [x] 5.0 Complete final verification
+  - [x] 5.1 Run `npm run build` - verify no errors
+  - [x] 5.2 Test admin flow: login → CRUD users → CRUD campaigns → CRUD orders → view payouts
+  - [x] 5.3 Test sales flow: login → view campaigns → view orders → view payouts
+  - [x] 5.4 Test logout → token cleared → redirect to login
+  - [x] 5.5 Verify all loading states display correctly
+  - [x] 5.6 Verify all error toasts display correctly
 
-- [ ] Create `src/hooks/useUsers.ts` with useQuery/useMutation
-- [ ] Create `src/hooks/useCampaigns.ts`
-- [ ] Create `src/hooks/useOrders.ts`
-- [ ] Create `src/hooks/usePayouts.ts`
-- [ ] Standardize cache keys and invalidation patterns
-
----
-
-### Task 14: Error Handling Polish
-**Priority:** P1 (Polish)
-
-- [ ] Ensure all API errors show Sonner toast
-- [ ] Format error messages from API response
-- [ ] Handle network errors (offline, timeout)
-- [ ] Add retry logic for failed requests
-
----
-
-### Task 15: Integration Testing
-**Priority:** P1 (Quality)
-
-- [ ] Test login flow end-to-end
-- [ ] Test CRUD operations for each entity
-- [ ] Test role-based access (admin vs sales)
-- [ ] Test error handling scenarios
-- [ ] Verify commission snapshot logic shows correctly
+**Acceptance Criteria:**
+- Build completes without errors
+- All admin CRUD operations work
+- Sales person has correct read-only access
+- All pages show loading states
+- All errors show toast notifications
 
 ---
 
 ## Execution Order
 
-```
-Phase 1 (Foundation):  Task 1 → Task 2 → Task 3
-Phase 2 (Auth):        Task 4 → Task 5 → Task 6 → Task 7
-Phase 3 (Pages):       Task 8 → Task 9 → Task 10 → Task 11 → Task 12
-Phase 4 (Polish):      Task 13 → Task 14 → Task 15
-```
-
-**Critical Path:** Tasks 1-5 must complete before page integrations.
-
----
-
-## Acceptance Criteria
-
-- [ ] All pages fetch real data from backend API
-- [ ] Login works with real credentials (admin/admin123)
-- [ ] Token persists across page reloads
-- [ ] Errors show as toast notifications
-- [ ] Loading states display during fetches
-- [ ] No more imports from mockData.ts (except types)
+Recommended implementation sequence:
+1. **Task Group 1**: Core Infrastructure (MUST be done first)
+2. **Task Group 2**: Data Management Pages (Users, Campaigns, Campaign Detail)
+3. **Task Group 3**: Orders & Payouts
+4. **Task Group 4**: Dashboard & Analytics + New Leaderboard Page
+5. **Final Verification**

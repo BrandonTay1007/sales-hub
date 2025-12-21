@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
-import { campaigns as initialCampaigns, users, orders as allOrders, Order, getCampaignRevenue, Campaign } from '@/lib/mockData';
+import { campaignsApi, ordersApi, usersApi, type Order, type Campaign, type Product, getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowLeft, ExternalLink, Settings, Facebook, Instagram, Plus, Trash2, X, Info, StopCircle, Edit2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Settings, Facebook, Instagram, Plus, Trash2, X, Info, Edit2, Loader2, StopCircle, RefreshCcw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 
 interface ProductRow {
@@ -17,12 +20,9 @@ interface ProductRow {
 const CampaignDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
-  const [campaignsState, setCampaignsState] = useState<Campaign[]>(initialCampaigns);
-  const campaign = campaignsState.find(c => c.id === id);
-  const salesPerson = campaign ? users.find(u => u.id === campaign.assignedSalesPersonId) : null;
 
-  const [orders, setOrders] = useState<Order[]>(allOrders);
   const [showAddOrder, setShowAddOrder] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [products, setProducts] = useState<ProductRow[]>([{ name: '', qty: 1, basePrice: 0 }]);
@@ -30,14 +30,190 @@ const CampaignDetailPage = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProducts, setEditProducts] = useState<ProductRow[]>([]);
 
-  const [editForm, setEditForm] = useState({
-    title: campaign?.title || '',
-    url: campaign?.url || '',
-    platform: campaign?.platform || 'facebook',
-    type: campaign?.type || 'post',
-    startDate: campaign?.startDate || '',
-    endDate: campaign?.endDate || '',
+  // Fetch campaign
+  const { data: campaign, isLoading: campaignLoading, error: campaignError } = useQuery({
+    queryKey: ['campaign', id],
+    queryFn: async () => {
+      const response = await campaignsApi.get(id!);
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data;
+    },
+    enabled: !!id,
   });
+
+  // Fetch orders for this campaign
+  const { data: campaignOrders = [], isLoading: ordersLoading } = useQuery({
+    queryKey: ['orders', { campaignId: id }],
+    queryFn: async () => {
+      const response = await ordersApi.list({ campaignId: id });
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data || [];
+    },
+    enabled: !!id,
+  });
+
+  // Fetch sales person details
+  const { data: salesPerson } = useQuery({
+    queryKey: ['user', campaign?.salesPersonId],
+    queryFn: async () => {
+      if (!campaign?.salesPersonId) return null;
+      const response = await usersApi.get(campaign.salesPersonId);
+      if (!response.success) return null;
+      return response.data;
+    },
+    enabled: !!campaign?.salesPersonId,
+  });
+
+  // Settings form state
+  const [editForm, setEditForm] = useState({
+    title: '',
+    url: '',
+    platform: 'facebook' as 'facebook' | 'instagram',
+    type: 'post' as 'post' | 'live' | 'event',
+    startDate: '',
+  });
+
+  // Update form when campaign loads
+  useEffect(() => {
+    if (campaign && editForm.title === '') {
+      setEditForm({
+        title: campaign.title,
+        url: campaign.url,
+        platform: campaign.platform,
+        type: campaign.type,
+        startDate: campaign.startDate ? campaign.startDate.split('T')[0] : '',
+      });
+    }
+  }, [campaign, editForm.title]);
+
+  // Create order mutation
+  const createOrderMutation = useMutation({
+    mutationFn: async (data: { campaignId: string; products: Product[] }) => {
+      const response = await ordersApi.create(data);
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setShowAddOrder(false);
+      setProducts([{ name: '', qty: 1, basePrice: 0 }]);
+      toast.success('Order added successfully!');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to add order', { description: error.message });
+    },
+  });
+
+  // Update order mutation
+  const updateOrderMutation = useMutation({
+    mutationFn: async ({ id, products }: { id: string; products: Product[] }) => {
+      const response = await ordersApi.update(id, { products });
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setViewingOrder(data || null);
+      setIsEditMode(false);
+      toast.success('Order updated!');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update order', { description: error.message });
+    },
+  });
+
+  // Delete order mutation
+  const deleteOrderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await ordersApi.delete(orderId);
+      if (!response.success) throw new Error(getErrorMessage(response));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setViewingOrder(null);
+      toast.success('Order deleted');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete order', { description: error.message });
+    },
+  });
+
+  // Update campaign mutation
+  const updateCampaignMutation = useMutation({
+    mutationFn: async (data: { title: string; url: string; platform: 'facebook' | 'instagram'; type: 'post' | 'live' | 'event'; startDate?: string }) => {
+      const response = await campaignsApi.update(id!, data);
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaign', id] });
+      setShowSettings(false);
+      toast.success('Campaign updated!');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update campaign', { description: error.message });
+    },
+  });
+
+  // Update campaign status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async (newStatus: 'active' | 'completed') => {
+      // When ending a campaign, set endDate to now; when reactivating, clear endDate
+      const updateData = {
+        status: newStatus,
+        ...(newStatus === 'completed' && { endDate: new Date().toISOString() }),
+        ...(newStatus === 'active' && { endDate: null }),
+      };
+      const response = await campaignsApi.update(id!, updateData);
+      if (!response.success) throw new Error(getErrorMessage(response));
+      return response.data;
+    },
+    onSuccess: (_, newStatus) => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      queryClient.invalidateQueries({ queryKey: ['campaign', id] });
+      toast.success(newStatus === 'completed' ? 'Campaign ended successfully' : 'Campaign reactivated');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to update campaign status', { description: error.message });
+    },
+  });
+
+  if (campaignError) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-12">
+          <p className="text-destructive">Error: {(campaignError as Error).message}</p>
+          <Link to="/campaigns" className="text-primary hover:underline mt-2 inline-block">
+            Back to Campaigns
+          </Link>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (campaignLoading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <Skeleton className="w-10 h-10 rounded-lg" />
+            <div>
+              <Skeleton className="h-6 w-48 mb-2" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="stat-card">
+                <Skeleton className="h-4 w-24 mb-2" />
+                <Skeleton className="h-8 w-32" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   if (!campaign) {
     return (
@@ -52,11 +228,9 @@ const CampaignDetailPage = () => {
     );
   }
 
-  const campaignOrders = orders.filter(o => o.campaignId === campaign.id);
-  const activeOrders = campaignOrders.filter(o => o.status === 'active');
-  const totalRevenue = activeOrders.reduce((sum, o) => sum + o.orderTotal, 0);
-  const totalCommission = activeOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
-  const totalItemsSold = activeOrders.reduce((sum, o) => sum + o.products.reduce((s, p) => s + p.qty, 0), 0);
+  const totalRevenue = campaignOrders.reduce((sum, o) => sum + o.orderTotal, 0);
+  const totalCommission = campaignOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
+  const totalItemsSold = campaignOrders.reduce((sum, o) => sum + o.products.reduce((s, p) => s + p.qty, 0), 0);
 
   const orderTotal = products.reduce((sum, p) => sum + (p.qty * p.basePrice), 0);
   const commissionAmount = salesPerson ? orderTotal * (salesPerson.commissionRate / 100) : 0;
@@ -79,43 +253,15 @@ const CampaignDetailPage = () => {
     e.preventDefault();
     if (!salesPerson) return;
 
-    const newOrder: Order = {
-      id: String(orders.length + 1),
+    const validProducts = products.filter(p => p.name && p.qty > 0);
+    if (validProducts.length === 0) {
+      toast.error('Please add at least one product');
+      return;
+    }
+
+    createOrderMutation.mutate({
       campaignId: campaign.id,
-      products: products.filter(p => p.name && p.qty > 0),
-      orderTotal,
-      snapshotRate: salesPerson.commissionRate,
-      commissionAmount,
-      createdAt: new Date().toISOString().split('T')[0],
-      status: 'active',
-    };
-
-    setOrders([...orders, newOrder]);
-    setShowAddOrder(false);
-    setProducts([{ name: '', qty: 1, basePrice: 0 }]);
-    toast.success('Order added successfully!');
-  };
-
-  const deleteOrder = (orderId: string) => {
-    const orderToDelete = orders.find(o => o.id === orderId);
-    if (!orderToDelete) return;
-
-    // Hard delete from state
-    setOrders(prev => prev.filter(o => o.id !== orderId));
-
-    // Show undo toast
-    toast.success('Order deleted', {
-      description: 'Order removed from records',
-      duration: 5000,
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          setOrders(prev => [...prev, orderToDelete].sort((a, b) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          ));
-          toast.success('Order restored');
-        },
-      },
+      products: validProducts.map(p => ({ name: p.name, qty: p.qty, basePrice: p.basePrice })),
     });
   };
 
@@ -134,18 +280,10 @@ const CampaignDetailPage = () => {
       return;
     }
 
-    const newTotal = validProducts.reduce((sum, p) => sum + (p.qty * p.basePrice), 0);
-    const newCommission = newTotal * (viewingOrder.snapshotRate / 100);
-
-    setOrders(orders.map(o =>
-      o.id === viewingOrder.id
-        ? { ...o, products: validProducts, orderTotal: newTotal, commissionAmount: newCommission }
-        : o
-    ));
-
-    setViewingOrder({ ...viewingOrder, products: validProducts, orderTotal: newTotal, commissionAmount: newCommission });
-    setIsEditMode(false);
-    toast.success('Order updated!');
+    updateOrderMutation.mutate({
+      id: viewingOrder.id,
+      products: validProducts.map(p => ({ name: p.name, qty: p.qty, basePrice: p.basePrice })),
+    });
   };
 
   const updateEditProduct = (index: number, field: keyof ProductRow, value: string | number) => {
@@ -162,31 +300,7 @@ const CampaignDetailPage = () => {
   };
 
   const handleSaveSettings = () => {
-    setCampaignsState(campaignsState.map(c =>
-      c.id === campaign.id
-        ? {
-          ...c,
-          title: editForm.title,
-          url: editForm.url,
-          platform: editForm.platform as 'facebook' | 'instagram',
-          type: editForm.type as 'post' | 'live' | 'event',
-          startDate: editForm.startDate || undefined,
-          endDate: editForm.endDate || undefined,
-        }
-        : c
-    ));
-    setShowSettings(false);
-    toast.success('Campaign updated!');
-  };
-
-  const handleEndCampaign = () => {
-    setCampaignsState(campaignsState.map(c =>
-      c.id === campaign.id
-        ? { ...c, status: 'completed' as const, endDate: new Date().toISOString().split('T')[0] }
-        : c
-    ));
-    setShowSettings(false);
-    toast.success('Campaign ended!');
+    updateCampaignMutation.mutate(editForm);
   };
 
   const getPlatformIcon = (platform: string) => {
@@ -195,6 +309,10 @@ const CampaignDetailPage = () => {
     ) : (
       <Instagram className="w-5 h-5 text-[#E4405F]" />
     );
+  };
+
+  const getAvatar = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
@@ -209,7 +327,18 @@ const CampaignDetailPage = () => {
             <div className="flex items-center gap-3">
               {getPlatformIcon(campaign.platform)}
               <div>
-                <h1 className="text-2xl font-bold text-foreground">{campaign.title}</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold text-foreground">{campaign.title}</h1>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${campaign.type === 'post' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                    campaign.type === 'live' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                      'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                    }`}>
+                    {campaign.type}
+                  </span>
+                  <span className={campaign.status === 'active' ? 'badge-active' : 'badge-inactive'}>
+                    {campaign.status}
+                  </span>
+                </div>
                 <a
                   href={campaign.url}
                   target="_blank"
@@ -224,6 +353,26 @@ const CampaignDetailPage = () => {
 
           {isAdmin && (
             <div className="flex items-center gap-3">
+              {campaign.status === 'active' && (
+                <button
+                  onClick={() => updateStatusMutation.mutate('completed')}
+                  className="btn-secondary text-destructive border-destructive/50 hover:bg-destructive/10"
+                  disabled={updateStatusMutation.isPending}
+                >
+                  <StopCircle className="w-4 h-4" />
+                  {updateStatusMutation.isPending ? 'Ending...' : 'End Campaign'}
+                </button>
+              )}
+              {campaign.status === 'completed' && (
+                <button
+                  onClick={() => updateStatusMutation.mutate('active')}
+                  className="btn-primary"
+                  disabled={updateStatusMutation.isPending}
+                >
+                  <RefreshCcw className="w-4 h-4" />
+                  {updateStatusMutation.isPending ? 'Reactivating...' : 'Reactivate Campaign'}
+                </button>
+              )}
               <button onClick={() => setShowSettings(true)} className="btn-secondary">
                 <Settings className="w-4 h-4" />
                 Settings
@@ -254,7 +403,7 @@ const CampaignDetailPage = () => {
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Assigned Sales Person</h3>
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-lg font-medium text-primary">
-                {salesPerson.avatar}
+                {getAvatar(salesPerson.name)}
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-foreground">{salesPerson.name}</p>
@@ -298,14 +447,23 @@ const CampaignDetailPage = () => {
                       <th className="table-header">Products</th>
                       <th className="table-header text-right">Total</th>
                       <th className="table-header text-right">Commission</th>
-                      <th className="table-header">Status</th>
                       {isAdmin && <th className="table-header">Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {campaignOrders.length === 0 ? (
+                    {ordersLoading ? (
+                      Array.from({ length: 3 }).map((_, i) => (
+                        <tr key={i} className="table-row">
+                          <td className="table-cell"><Skeleton className="h-4 w-20" /></td>
+                          <td className="table-cell"><Skeleton className="h-4 w-16" /></td>
+                          <td className="table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                          <td className="table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
+                          {isAdmin && <td className="table-cell"><Skeleton className="h-6 w-16" /></td>}
+                        </tr>
+                      ))
+                    ) : campaignOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={isAdmin ? 6 : 5} className="table-cell text-center text-muted-foreground py-8">
+                        <td colSpan={isAdmin ? 5 : 4} className="table-cell text-center text-muted-foreground py-8">
                           No orders yet
                         </td>
                       </tr>
@@ -313,42 +471,48 @@ const CampaignDetailPage = () => {
                       campaignOrders.map((order) => (
                         <tr
                           key={order.id}
-                          className={`table-row cursor-pointer hover:bg-secondary/70 ${order.status === 'cancelled' ? 'opacity-50' : ''}`}
+                          className="table-row cursor-pointer hover:bg-secondary/70"
                           onClick={() => handleRowClick(order)}
                         >
-                          <td className="table-cell">{order.createdAt}</td>
+                          <td className="table-cell">{order.createdAt.split('T')[0]}</td>
                           <td className="table-cell">
-                            <span className={order.status === 'cancelled' ? 'line-through text-muted-foreground' : ''}>
-                              {order.products.length} items
-                            </span>
+                            <Tooltip>
+                              <TooltipTrigger className="text-left">
+                                <span className="text-sm">
+                                  {order.products[0]?.name || 'No products'}
+                                  {order.products.length > 1 && ` +${order.products.length - 1} more`}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="space-y-1">
+                                  {order.products.map((p, i) => (
+                                    <p key={i}>{p.name} ×{p.qty} (RM{(p.qty * p.basePrice).toFixed(2)})</p>
+                                  ))}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
                           </td>
                           <td className="table-cell text-right font-medium">RM {order.orderTotal.toFixed(2)}</td>
                           <td className="table-cell text-right text-success">RM {order.commissionAmount.toFixed(2)}</td>
-                          <td className="table-cell">
-                            <span className={order.status === 'active' ? 'badge-active' : 'badge-inactive'}>
-                              {order.status}
-                            </span>
-                          </td>
                           {isAdmin && (
                             <td className="table-cell">
-                              {order.status === 'active' && (
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setViewingOrder(order); setIsEditMode(true); setEditProducts(order.products.map(p => ({ ...p }))); }}
-                                    className="p-1 hover:bg-secondary rounded transition-colors"
-                                    title="Edit Order"
-                                  >
-                                    <Edit2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); deleteOrder(order.id); }}
-                                    className="p-1 hover:bg-destructive/10 rounded transition-colors"
-                                    title="Delete Order"
-                                  >
-                                    <Trash2 className="w-4 h-4 text-destructive" />
-                                  </button>
-                                </div>
-                              )}
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setViewingOrder(order); setIsEditMode(true); setEditProducts(order.products.map(p => ({ ...p }))); }}
+                                  className="p-1 hover:bg-secondary rounded transition-colors"
+                                  title="Edit Order"
+                                >
+                                  <Edit2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); deleteOrderMutation.mutate(order.id); }}
+                                  className="p-1 hover:bg-destructive/10 rounded transition-colors"
+                                  title="Delete Order"
+                                  disabled={deleteOrderMutation.isPending}
+                                >
+                                  <Trash2 className="w-4 h-4 text-destructive" />
+                                </button>
+                              </div>
                             </td>
                           )}
                         </tr>
@@ -369,13 +533,13 @@ const CampaignDetailPage = () => {
                   <p className="text-xl font-bold text-foreground">{campaignOrders.length}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-secondary/30">
-                  <p className="text-sm text-muted-foreground">Active Orders</p>
-                  <p className="text-xl font-bold text-foreground">{activeOrders.length}</p>
+                  <p className="text-sm text-muted-foreground">Items Sold</p>
+                  <p className="text-xl font-bold text-foreground">{totalItemsSold}</p>
                 </div>
                 <div className="p-4 rounded-lg bg-secondary/30">
                   <p className="text-sm text-muted-foreground">Avg. Order Value</p>
                   <p className="text-xl font-bold text-foreground">
-                    RM {activeOrders.length > 0 ? (totalRevenue / activeOrders.length).toFixed(2) : '0.00'}
+                    RM {campaignOrders.length > 0 ? (totalRevenue / campaignOrders.length).toFixed(2) : '0.00'}
                   </p>
                 </div>
                 <div className="p-4 rounded-lg bg-secondary/30">
@@ -383,24 +547,11 @@ const CampaignDetailPage = () => {
                   <p className="text-xl font-bold text-primary">{salesPerson?.commissionRate || 0}%</p>
                 </div>
               </div>
-
-              <div className="mt-6 p-4 rounded-lg bg-primary/5 border border-primary/20">
-                <p className="text-sm text-muted-foreground">Assigned Sales Person</p>
-                <div className="flex items-center gap-3 mt-2">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
-                    {salesPerson?.avatar}
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">{salesPerson?.name}</p>
-                    <p className="text-sm text-muted-foreground">{salesPerson?.commissionRate}% commission rate</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </TabsContent>
         </Tabs>
 
-        {/* Settings Modal (Centered Dialog) */}
+        {/* Settings Modal */}
         <Dialog open={showSettings} onOpenChange={setShowSettings}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -450,43 +601,34 @@ const CampaignDetailPage = () => {
                   className="form-input"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">Start Date</label>
-                  <input
-                    type="date"
-                    value={editForm.startDate}
-                    onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
-                    className="form-input"
-                  />
-                </div>
-                <div>
-                  <label className="form-label">End Date</label>
-                  <input
-                    type="date"
-                    value={editForm.endDate}
-                    onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
-                    className="form-input"
-                  />
-                </div>
-              </div>
 
-              {campaign.status === 'active' && (
-                <button
-                  onClick={handleEndCampaign}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                >
-                  <StopCircle className="w-4 h-4" />
-                  End Campaign Now
-                </button>
-              )}
+              <div>
+                <label className="form-label">Start Date</label>
+                <input
+                  type="date"
+                  value={editForm.startDate}
+                  onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                  className="form-input"
+                />
+              </div>
 
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowSettings(false)} className="btn-secondary flex-1">
                   Cancel
                 </button>
-                <button onClick={handleSaveSettings} className="btn-primary flex-1">
-                  Save Changes
+                <button
+                  onClick={handleSaveSettings}
+                  className="btn-primary flex-1"
+                  disabled={updateCampaignMutation.isPending}
+                >
+                  {updateCampaignMutation.isPending ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </span>
+                  ) : (
+                    'Save Changes'
+                  )}
                 </button>
               </div>
             </div>
@@ -577,8 +719,19 @@ const CampaignDetailPage = () => {
                   <button type="button" onClick={() => setShowAddOrder(false)} className="btn-secondary flex-1">
                     Cancel
                   </button>
-                  <button type="submit" className="btn-primary flex-1">
-                    Add Order
+                  <button
+                    type="submit"
+                    className="btn-primary flex-1"
+                    disabled={createOrderMutation.isPending}
+                  >
+                    {createOrderMutation.isPending ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Adding...
+                      </span>
+                    ) : (
+                      'Add Order'
+                    )}
                   </button>
                 </div>
               </form>
@@ -594,17 +747,9 @@ const CampaignDetailPage = () => {
             </DialogHeader>
             {viewingOrder && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Date</p>
-                    <p className="font-medium">{viewingOrder.createdAt}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Status</p>
-                    <span className={viewingOrder.status === 'active' ? 'badge-active' : 'badge-inactive'}>
-                      {viewingOrder.status}
-                    </span>
-                  </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="font-medium">{viewingOrder.createdAt.split('T')[0]}</p>
                 </div>
 
                 <div>
@@ -693,15 +838,27 @@ const CampaignDetailPage = () => {
                     <button onClick={() => setIsEditMode(false)} className="btn-secondary flex-1">
                       Cancel
                     </button>
-                    <button onClick={handleSaveEdit} className="btn-primary flex-1">
-                      Save Changes
+                    <button
+                      onClick={handleSaveEdit}
+                      className="btn-primary flex-1"
+                      disabled={updateOrderMutation.isPending}
+                    >
+                      {updateOrderMutation.isPending ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Saving...
+                        </span>
+                      ) : (
+                        'Save Changes'
+                      )}
                     </button>
                   </div>
                 ) : (
-                  viewingOrder.status === 'active' && isAdmin && (
+                  isAdmin && (
                     <button
-                      onClick={() => { deleteOrder(viewingOrder.id); setViewingOrder(null); }}
+                      onClick={() => { deleteOrderMutation.mutate(viewingOrder.id); }}
                       className="w-full text-destructive hover:bg-destructive/10 py-2 rounded-lg transition-colors text-sm font-medium"
+                      disabled={deleteOrderMutation.isPending}
                     >
                       Delete Order
                     </button>

@@ -12,6 +12,7 @@ interface CreateCampaignData {
     type: CampaignType;
     url: string;
     salesPersonId: string;
+    startDate?: Date | null;
 }
 
 interface UpdateCampaignData {
@@ -20,6 +21,8 @@ interface UpdateCampaignData {
     type?: CampaignType;
     url?: string;
     status?: CampaignStatus;
+    startDate?: Date | null;
+    endDate?: Date | null;
     // NOTE: salesPersonId is IMMUTABLE - cannot be changed after creation
 }
 
@@ -59,6 +62,8 @@ export const campaignService = {
             type: c.type,
             url: c.url,
             status: c.status,
+            startDate: c.startDate,
+            endDate: c.endDate,
             salesPersonId: c.salesPersonId,
             salesPerson: c.salesPerson,
             orderCount: c._count.orders,
@@ -114,6 +119,8 @@ export const campaignService = {
             type: campaign.type,
             url: campaign.url,
             status: campaign.status,
+            startDate: campaign.startDate,
+            endDate: campaign.endDate,
             salesPersonId: campaign.salesPersonId,
             salesPerson: campaign.salesPerson,
             orderCount: activeOrders.length,
@@ -149,6 +156,7 @@ export const campaignService = {
                 url: data.url,
                 salesPersonId: data.salesPersonId,
                 status: 'active',
+                startDate: data.startDate || null,
             },
             include: {
                 salesPerson: {
@@ -178,6 +186,16 @@ export const campaignService = {
             throw new NotFoundError('Campaign not found');
         }
 
+        // Auto-set endDate when status changes to completed (if not already set)
+        let endDateValue = data.endDate;
+        if (data.status === 'completed' && !existing.endDate && endDateValue === undefined) {
+            endDateValue = new Date();
+        }
+        // Clear endDate when reactivating
+        if (data.status === 'active' && existing.status === 'completed') {
+            endDateValue = null;
+        }
+
         const campaign = await prisma.campaign.update({
             where: { id },
             data: {
@@ -186,6 +204,8 @@ export const campaignService = {
                 ...(data.type && { type: data.type }),
                 ...(data.url && { url: data.url }),
                 ...(data.status && { status: data.status }),
+                ...(data.startDate !== undefined && { startDate: data.startDate }),
+                ...(endDateValue !== undefined && { endDate: endDateValue }),
             },
             include: {
                 salesPerson: {

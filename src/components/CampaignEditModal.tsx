@@ -1,12 +1,13 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Campaign, users } from '@/lib/mockData';
-import { StopCircle } from 'lucide-react';
+import { StopCircle, RefreshCcw } from 'lucide-react';
 
 interface CampaignEditModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSubmit: (formData: CampaignFormData) => void;
     onEndCampaign?: () => void;
+    onReactivateCampaign?: () => void;
     campaign?: Campaign | null;
     isCreation?: boolean;
 }
@@ -18,7 +19,6 @@ export interface CampaignFormData {
     url: string;
     assignedSalesPersonId: string;
     startDate: string;
-    endDate: string;
 }
 
 export const CampaignEditModal = ({
@@ -26,6 +26,7 @@ export const CampaignEditModal = ({
     onOpenChange,
     onSubmit,
     onEndCampaign,
+    onReactivateCampaign,
     campaign,
     isCreation = false
 }: CampaignEditModalProps) => {
@@ -51,7 +52,6 @@ export const CampaignEditModal = ({
             url: formData.get('url') as string,
             assignedSalesPersonId: formData.get('assignedSalesPersonId') as string || campaign?.assignedSalesPersonId || '',
             startDate: formData.get('startDate') as string,
-            endDate: formData.get('endDate') as string,
         });
     };
 
@@ -136,25 +136,14 @@ export const CampaignEditModal = ({
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="form-label">Start Date</label>
-                            <input
-                                type="date"
-                                name="startDate"
-                                defaultValue={campaign?.startDate || ''}
-                                className="form-input"
-                            />
-                        </div>
-                        <div>
-                            <label className="form-label">End Date</label>
-                            <input
-                                type="date"
-                                name="endDate"
-                                defaultValue={campaign?.endDate || ''}
-                                className="form-input"
-                            />
-                        </div>
+                    <div>
+                        <label className="form-label">Start Date</label>
+                        <input
+                            type="date"
+                            name="startDate"
+                            defaultValue={campaign?.startDate || ''}
+                            className="form-input"
+                        />
                     </div>
 
                     {!isCreation && campaign?.status === 'active' && onEndCampaign && (
@@ -165,6 +154,17 @@ export const CampaignEditModal = ({
                         >
                             <StopCircle className="w-4 h-4" />
                             End Campaign Now
+                        </button>
+                    )}
+
+                    {!isCreation && campaign?.status === 'completed' && onReactivateCampaign && (
+                        <button
+                            type="button"
+                            onClick={onReactivateCampaign}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                        >
+                            <RefreshCcw className="w-4 h-4" />
+                            Reactivate Campaign
                         </button>
                     )}
 
