@@ -103,7 +103,9 @@ const PayoutsPage = () => {
         totalCommission: campaignCommission,
         avgRate,
       };
-    }).filter(b => !filterCampaign || b.campaign.id === filterCampaign);
+    })
+      .filter(b => b.orders.length > 0) // Only show campaigns with orders in selected month/year
+      .filter(b => !filterCampaign || b.campaign.id === filterCampaign);
   }, [userMonthOrders, userCampaigns, filterCampaign, user?.commissionRate]);
 
   // Calculate monthly earnings for the last 6 months (for trend chart)
