@@ -10,6 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
+import { useOrderFilters } from '@/hooks/useOrderFilters';
+import { OrderFilters } from '@/components/OrderFilters';
+import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
 
 interface ProductRow {
   name: string;
@@ -64,6 +67,18 @@ const CampaignDetailPage = () => {
     enabled: !!campaign?.salesPersonId,
   });
 
+  // Use order filters hook
+  const {
+    filteredOrders,
+    filters,
+    setters,
+    clearFilters,
+    hasFilters
+  } = useOrderFilters({
+    orders: campaignOrders,
+    isAdmin: true, // We already fetched orders specific to this campaign, so bypass the hook's ownership check
+  });
+
   // Settings form state
   const [editForm, setEditForm] = useState({
     title: '',
@@ -72,6 +87,11 @@ const CampaignDetailPage = () => {
     type: 'post' as 'post' | 'live' | 'event',
     startDate: '',
   });
+
+  // Delete state
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const [deleteCampaignId, setDeleteCampaignId] = useState<string | null>(null);
 
   // Update form when campaign loads
   useEffect(() => {
@@ -138,6 +158,36 @@ const CampaignDetailPage = () => {
     },
   });
 
+  const confirmDeleteOrder = () => {
+    if (!deleteOrderId) return;
+    const orderId = deleteOrderId;
+    setDeleteOrderId(null);
+
+    let timer: NodeJS.Timeout;
+
+    // Show undo toast with 5-second window
+    const toastId = toast('Order will be deleted in 5 seconds', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timer);
+          setPendingDelete(null);
+          toast.dismiss(toastId);
+          toast.info('Deletion cancelled');
+        },
+      },
+      duration: 5000,
+    });
+
+    // Set timeout for actual deletion after 5 seconds
+    timer = setTimeout(() => {
+      deleteOrderMutation.mutate(orderId);
+      setPendingDelete(null);
+    }, 5000);
+
+    setPendingDelete({ id: orderId, timer });
+  };
+
   // Update campaign mutation
   const updateCampaignMutation = useMutation({
     mutationFn: async (data: { title: string; url: string; platform: 'facebook' | 'instagram'; type: 'post' | 'live' | 'event'; startDate?: string }) => {
@@ -177,6 +227,52 @@ const CampaignDetailPage = () => {
       toast.error('Failed to update campaign status', { description: error.message });
     },
   });
+
+  // Delete campaign mutation
+  const deleteCampaignMutation = useMutation({
+    mutationFn: async (campaignId: string) => {
+      const response = await campaignsApi.delete(campaignId);
+      if (!response.success) throw new Error(getErrorMessage(response));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      navigate('/campaigns');
+      toast.success('Campaign deleted');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete campaign', { description: error.message });
+    },
+  });
+
+  const confirmDeleteCampaign = () => {
+    if (!deleteCampaignId) return;
+    const campaignId = deleteCampaignId;
+    setDeleteCampaignId(null);
+
+    let timer: NodeJS.Timeout;
+
+    // Initial toast with undo
+    const toastId = toast('Campaign will be deleted in 5 seconds', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timer);
+          setPendingDelete(null);
+          toast.dismiss(toastId);
+          toast.info('Deletion cancelled');
+        },
+      },
+      duration: 5000,
+    });
+
+    // Set timer for actual deletion
+    timer = setTimeout(() => {
+      deleteCampaignMutation.mutate(campaignId);
+      setPendingDelete(null);
+    }, 5000);
+
+    setPendingDelete({ id: campaignId, timer });
+  };
 
   if (campaignError) {
     return (
@@ -328,6 +424,9 @@ const CampaignDetailPage = () => {
               {getPlatformIcon(campaign.platform)}
               <div>
                 <div className="flex items-center gap-2">
+                  <span className="text-lg font-mono text-muted-foreground bg-secondary/50 px-2 py-0.5 rounded">
+                    {campaign.referenceId}
+                  </span>
                   <h1 className="text-2xl font-bold text-foreground">{campaign.title}</h1>
                   <span className={`px-2 py-0.5 rounded text-xs font-medium capitalize ${campaign.type === 'post' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
                     campaign.type === 'live' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
@@ -373,6 +472,15 @@ const CampaignDetailPage = () => {
                   {updateStatusMutation.isPending ? 'Reactivating...' : 'Reactivate Campaign'}
                 </button>
               )}
+
+              <button
+                onClick={() => setDeleteCampaignId(campaign.id)}
+                className="btn-secondary text-destructive border-destructive/50 hover:bg-destructive/10"
+                disabled={deleteCampaignMutation.isPending || !!pendingDelete}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
               <button onClick={() => setShowSettings(true)} className="btn-secondary">
                 <Settings className="w-4 h-4" />
                 Settings
@@ -429,20 +537,54 @@ const CampaignDetailPage = () => {
 
           <TabsContent value="orders" className="mt-4">
             <div className="dashboard-card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-foreground">Campaign Orders</h3>
-                {isAdmin && (
-                  <button onClick={() => setShowAddOrder(true)} className="btn-primary text-sm">
-                    <Plus className="w-4 h-4" />
-                    Add Order
-                  </button>
-                )}
+              <div className="flex flex-col gap-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-foreground">Campaign Orders</h3>
+                    <span className="text-sm text-muted-foreground">({filteredOrders.length})</span>
+                  </div>
+                  {isAdmin && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <button
+                            onClick={() => setShowAddOrder(true)}
+                            className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={campaign.status !== 'active'}
+                          >
+                            <Plus className="w-4 h-4" />
+                            Add Order
+                          </button>
+                        </span>
+                      </TooltipTrigger>
+                      {campaign.status !== 'active' && (
+                        <TooltipContent>
+                          <p>Reactivate campaign to add orders</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  )}
+                </div>
+
+                {/* Filters */}
+                <OrderFilters
+                  filters={filters}
+                  setters={setters}
+                  onClear={clearFilters}
+                  hasFilters={hasFilters}
+                  isAdmin={false} // Hide sales person filter in campaign detail view
+                  userCampaigns={[]} // Not needed
+                  salesUsers={[]} // Not needed
+                  showCampaignFilter={false}
+                  className="mb-4"
+                />
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-secondary/50">
                     <tr>
+                      <th className="table-header">Ref</th>
                       <th className="table-header">Date</th>
                       <th className="table-header">Products</th>
                       <th className="table-header text-right">Total</th>
@@ -455,25 +597,27 @@ const CampaignDetailPage = () => {
                       Array.from({ length: 3 }).map((_, i) => (
                         <tr key={i} className="table-row">
                           <td className="table-cell"><Skeleton className="h-4 w-20" /></td>
+                          <td className="table-cell"><Skeleton className="h-4 w-20" /></td>
                           <td className="table-cell"><Skeleton className="h-4 w-16" /></td>
                           <td className="table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
                           <td className="table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></td>
                           {isAdmin && <td className="table-cell"><Skeleton className="h-6 w-16" /></td>}
                         </tr>
                       ))
-                    ) : campaignOrders.length === 0 ? (
+                    ) : filteredOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={isAdmin ? 5 : 4} className="table-cell text-center text-muted-foreground py-8">
-                          No orders yet
+                        <td colSpan={isAdmin ? 6 : 5} className="table-cell text-center text-muted-foreground py-8">
+                          {hasFilters ? 'No orders match your filters' : 'No orders yet'}
                         </td>
                       </tr>
                     ) : (
-                      campaignOrders.map((order) => (
+                      filteredOrders.map((order) => (
                         <tr
                           key={order.id}
                           className="table-row cursor-pointer hover:bg-secondary/70"
                           onClick={() => handleRowClick(order)}
                         >
+                          <td className="table-cell font-mono text-xs text-muted-foreground">{order.referenceId}</td>
                           <td className="table-cell">{order.createdAt.split('T')[0]}</td>
                           <td className="table-cell">
                             <Tooltip>
@@ -505,10 +649,10 @@ const CampaignDetailPage = () => {
                                   <Edit2 className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                                 </button>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); deleteOrderMutation.mutate(order.id); }}
+                                  onClick={(e) => { e.stopPropagation(); setDeleteOrderId(order.id); }}
                                   className="p-1 hover:bg-destructive/10 rounded transition-colors"
                                   title="Delete Order"
-                                  disabled={deleteOrderMutation.isPending}
+                                  disabled={pendingDelete?.id === order.id}
                                 >
                                   <Trash2 className="w-4 h-4 text-destructive" />
                                 </button>
@@ -743,7 +887,14 @@ const CampaignDetailPage = () => {
         <Dialog open={!!viewingOrder} onOpenChange={() => { setViewingOrder(null); setIsEditMode(false); }}>
           <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Order Details</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                Order Details
+                {viewingOrder?.referenceId && (
+                  <span className="text-sm font-mono font-normal text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                    {viewingOrder.referenceId}
+                  </span>
+                )}
+              </DialogTitle>
             </DialogHeader>
             {viewingOrder && (
               <div className="space-y-4">
@@ -869,7 +1020,24 @@ const CampaignDetailPage = () => {
           </DialogContent>
         </Dialog>
       </div>
-    </DashboardLayout>
+      {/* Confirm Delete Order Dialog */}
+      <ConfirmDeleteDialog
+        open={!!deleteOrderId}
+        onOpenChange={(open) => !open && setDeleteOrderId(null)}
+        title="Delete Order"
+        description="Are you sure you want to delete this order? This action cannot be undone."
+        onConfirm={confirmDeleteOrder}
+      />
+
+      {/* Confirm Delete Campaign Dialog */}
+      <ConfirmDeleteDialog
+        open={!!deleteCampaignId}
+        onOpenChange={(open) => !open && setDeleteCampaignId(null)}
+        title="Delete Campaign"
+        description="Are you sure you want to delete this campaign? This action cannot be undone and will delete all associated orders."
+        onConfirm={confirmDeleteCampaign}
+      />
+    </DashboardLayout >
   );
 };
 

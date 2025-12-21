@@ -38,9 +38,18 @@ enum UserStatus {
   inactive
 }
 
+// Counter model for atomic sequence generation (auto-increment IDs)
+model Counter {
+  id  String @id @map("_id") // e.g., "campaign_facebook", "order_FB-001"
+  seq Int    @default(0)
+
+  @@map("counters")
+}
+
 // Campaign model - Social media post, live, or event
 model Campaign {
   id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  referenceId   String         @unique // Human-readable ID, e.g., "FB-001", "IG-002"
   title         String
   platform      Platform
   type          CampaignType
@@ -79,6 +88,7 @@ enum CampaignStatus {
 // Order model - Sales order with products and commission
 model Order {
   id               String      @id @default(auto()) @map("_id") @db.ObjectId
+  referenceId      String      @unique // Human-readable ID, e.g., "FB-001-01"
   campaignId       String      @db.ObjectId
   products         Product[] // Embedded array of products
   orderTotal       Float // Calculated: sum of products

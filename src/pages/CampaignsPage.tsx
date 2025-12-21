@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { campaignsApi, usersApi, ordersApi, type Campaign, type User, getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Facebook, Instagram, Edit2, ExternalLink, Lock, Filter, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Facebook, Instagram, Edit2, ExternalLink, Lock, Filter, Trash2, Loader2, Search } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,6 +31,7 @@ const CampaignsPage = () => {
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
 
   // Filter State
+  const [searchTerm, setSearchTerm] = useState('');
   const [filterSalesPerson, setFilterSalesPerson] = useState('');
   const [filterPlatform, setFilterPlatform] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -153,15 +154,44 @@ const CampaignsPage = () => {
       ? campaigns
       : campaigns.filter(c => c.salesPersonId === user?.id);
 
-    // Quick Filters
+    // Apply strict search first if exists
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(c =>
+        c.title.toLowerCase().includes(searchLower) ||
+        (c.referenceId && c.referenceId.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Helper to get effective date for filtering (prefer startDate, fallback to createdAt)
+    const getEffectiveDate = (c: Campaign) => {
+      if (c.startDate) return new Date(c.startDate);
+      return new Date(c.createdAt);
+    };
+
+    // Quick Filters (Robust Date Logic - Overlap)
+    const now = new Date();
+    const windowEnd = new Date(now);
+    windowEnd.setHours(23, 59, 59, 999);
+
     if (quickFilter === 'week') {
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      const weekAgoStr = weekAgo.toISOString().split('T')[0];
-      filtered = filtered.filter(c => c.createdAt >= weekAgoStr);
+      const windowStart = new Date(now);
+      windowStart.setDate(windowStart.getDate() - 7);
+      windowStart.setHours(0, 0, 0, 0);
+
+      filtered = filtered.filter(c => {
+        const start = getEffectiveDate(c);
+        const end = c.endDate ? new Date(c.endDate) : null;
+        return start <= windowEnd && (!end || end >= windowStart);
+      });
     } else if (quickFilter === 'month') {
-      const monthPrefix = new Date().toISOString().slice(0, 7);
-      filtered = filtered.filter(c => c.createdAt.startsWith(monthPrefix));
+      const windowStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      filtered = filtered.filter(c => {
+        const start = getEffectiveDate(c);
+        const end = c.endDate ? new Date(c.endDate) : null;
+        return start <= windowEnd && (!end || end >= windowStart);
+      });
     }
 
     // Explicit Filters
@@ -169,15 +199,18 @@ const CampaignsPage = () => {
       if (filterSalesPerson && campaign.salesPersonId !== filterSalesPerson) return false;
       if (filterPlatform && campaign.platform !== filterPlatform) return false;
       if (filterStatus && campaign.status !== filterStatus) return false;
-      if (filterDateFrom && campaign.createdAt < filterDateFrom) return false;
-      if (filterDateTo && campaign.createdAt > filterDateTo) return false;
+
+      const campaignDate = getEffectiveDate(campaign).toISOString().split('T')[0];
+      if (filterDateFrom && campaignDate < filterDateFrom) return false;
+      if (filterDateTo && campaignDate > filterDateTo) return false;
       return true;
     });
 
     return filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [campaigns, isAdmin, user?.id, filterSalesPerson, filterPlatform, filterStatus, filterDateFrom, filterDateTo, quickFilter]);
+  }, [campaigns, isAdmin, user?.id, searchTerm, filterSalesPerson, filterPlatform, filterStatus, filterDateFrom, filterDateTo, quickFilter]);
 
   const clearFilters = () => {
+    setSearchTerm('');
     setFilterSalesPerson('');
     setFilterPlatform('');
     setFilterStatus('');
@@ -186,7 +219,7 @@ const CampaignsPage = () => {
     setQuickFilter('all');
   };
 
-  const hasFilters = filterSalesPerson || filterPlatform || filterStatus || filterDateFrom || filterDateTo || quickFilter !== 'all';
+  const hasFilters = searchTerm || filterSalesPerson || filterPlatform || filterStatus || filterDateFrom || filterDateTo || quickFilter !== 'all';
 
   const handleCreateClick = () => {
     setEditingCampaign(null);
@@ -234,24 +267,24 @@ const CampaignsPage = () => {
     const campaignId = deleteCampaignId;
     setDeleteCampaignId(null);
 
+    let timer: NodeJS.Timeout;
+
     // Show undo toast with 5-second window
-    const toastId = toast.success('Campaign deleted', {
+    const toastId = toast('Campaign will be deleted in 5 seconds', {
       action: {
         label: 'Undo',
         onClick: () => {
-          if (pendingDelete?.timer) {
-            clearTimeout(pendingDelete.timer);
-            setPendingDelete(null);
-            toast.dismiss(toastId);
-            toast.info('Deletion cancelled');
-          }
+          clearTimeout(timer);
+          setPendingDelete(null);
+          toast.dismiss(toastId);
+          toast.info('Deletion cancelled');
         },
       },
       duration: 5000,
     });
 
     // Set timeout for actual deletion after 5 seconds
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       deleteMutation.mutate(campaignId);
       setPendingDelete(null);
     }, 5000);
@@ -311,35 +344,51 @@ const CampaignsPage = () => {
             )}
           </div>
 
-          {/* Quick Filter Toggles */}
-          <div className="flex gap-2 mb-4">
-            <button
-              onClick={() => setQuickFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'all'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-            >
-              All Time
-            </button>
-            <button
-              onClick={() => setQuickFilter('week')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'week'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-            >
-              This Week
-            </button>
-            <button
-              onClick={() => setQuickFilter('month')}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === 'month'
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                }`}
-            >
-              This Month
-            </button>
+          <div className="flex flex-col gap-4 mb-4">
+            {/* Search and Quick Filters */}
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="relative w-full md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search campaigns..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="form-input pl-9"
+                />
+              </div>
+
+              {/* Quick Filter Toggles */}
+              <div className="flex w-full md:w-auto gap-2 bg-secondary/20 p-1 rounded-lg">
+                <button
+                  onClick={() => setQuickFilter('all')}
+                  className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all ${quickFilter === 'all'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                >
+                  All Time
+                </button>
+                <button
+                  onClick={() => setQuickFilter('week')}
+                  className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all ${quickFilter === 'week'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                >
+                  This Week
+                </button>
+                <button
+                  onClick={() => setQuickFilter('month')}
+                  className={`flex-1 md:flex-none px-3 py-1.5 rounded-md text-sm font-medium transition-all ${quickFilter === 'month'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                >
+                  This Month
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-wrap lg:flex-nowrap gap-3">
@@ -413,6 +462,7 @@ const CampaignsPage = () => {
             <table className="w-full">
               <thead className="bg-secondary/50">
                 <tr>
+                  <th className="table-header">Ref</th>
                   <th className="table-header">Title</th>
                   <th className="table-header">Sales Person</th>
                   <th className="table-header">Platform</th>
@@ -427,6 +477,7 @@ const CampaignsPage = () => {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="table-row">
+                      <td className="table-cell"><Skeleton className="h-4 w-16" /></td>
                       <td className="table-cell"><Skeleton className="h-4 w-32" /></td>
                       <td className="table-cell">
                         <div className="flex items-center gap-2">
@@ -444,7 +495,7 @@ const CampaignsPage = () => {
                   ))
                 ) : filteredCampaigns.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="table-cell text-center text-muted-foreground py-8">
+                    <td colSpan={9} className="table-cell text-center text-muted-foreground py-8">
                       {isAdmin
                         ? (hasFilters ? 'No campaigns match your filters' : 'No campaigns found')
                         : (hasFilters ? 'No campaigns match your filters' : 'No campaigns assigned to you yet')}
@@ -462,6 +513,7 @@ const CampaignsPage = () => {
                         className="table-row cursor-pointer hover:bg-secondary/70"
                         onClick={() => handleRowClick(campaign.id)}
                       >
+                        <td className="table-cell font-mono text-xs text-muted-foreground">{campaign.referenceId}</td>
                         <td className="table-cell font-medium">{campaign.title}</td>
                         <td className="table-cell">
                           <div className="flex items-center gap-2">

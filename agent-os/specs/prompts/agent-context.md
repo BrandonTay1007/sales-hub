@@ -10,6 +10,12 @@ This document provides comprehensive context for AI agents working on the Pebble
 
 **Pebble Sales Hub** is a sales commission tracking system for a startup that sells products through social media campaigns (Facebook, Instagram). It replaces their manual Excel/paper tracking with a web application.
 
+## Imporant file reference
+**ALWAYS READ AND ANALYZE ALL THIS FILE BEFORE STARTING ANY THINKING**
+agent-os/product/
+requirements/
+agent-os/specs/
+
 ### Tech Stack
 
 | Layer | Technology |
@@ -83,6 +89,7 @@ sales-hub/
 | Field | Type | Notes |
 |-------|------|-------|
 | id | ObjectId | Primary key |
+| referenceId | string | Unique, Auto-gen (e.g. `FB-001`) |
 | title | string | Campaign name |
 | platform | enum | `facebook` or `instagram` |
 | type | enum | `post`, `live`, or `event` |
@@ -96,6 +103,7 @@ sales-hub/
 | Field | Type | Notes |
 |-------|------|-------|
 | id | ObjectId | Primary key |
+| referenceId | string | Unique, Auto-gen (e.g. `FB-001-01`) |
 | campaignId | ObjectId | **IMMUTABLE** after creation |
 | products | JSON | Array of {name, qty, basePrice} |
 | orderTotal | number | SUM(qty × basePrice) |
@@ -171,18 +179,18 @@ When an order is **CREATED**:
 
 ## Frontend Pages
 
-| Page | Route | Description |
-|------|-------|-------------|
-| Login | `/login` | JWT authentication |
-| Dashboard | `/` or `/dashboard` | Stats, charts, top performer |
-| Users | `/users` | User management (admin) |
-| Campaigns | `/campaigns` | Campaign list with filters |
-| Campaign Detail | `/campaigns/:id` | Orders, stats, settings |
-| Orders | `/orders` | Order list with filters |
-| My Payouts | `/payouts` | Sales person's commission breakdown |
-| Team Payouts | `/payouts/team` | All sales persons (admin) |
-| Analytics | `/analytics` | Revenue trends, top products |
-| Leaderboard | `/analytics/leaderboard` | Toggle: Sales/Campaign view |
+| Page | Route | Description | Related Entity |
+|------|-------|-------------|----------------|
+| Login | `/login` | JWT authentication | Auth |
+| Dashboard | `/` or `/dashboard` | Stats, charts, top performer | Summary |
+| Users | `/users` | User management (admin) | **User** |
+| Campaigns | `/campaigns` | Campaign list with filters | **Campaign** |
+| Campaign Detail | `/campaigns/:id` | Orders list, stats, settings | **Campaign**, **Order** |
+| Orders | `/orders` | Order list with filters | **Order** |
+| My Payouts | `/payouts` | Sales person's commission breakdown | **Payout**, **Campaign** |
+| Team Payouts | `/payouts/team` | All sales persons (admin) | **Payout**, **User** |
+| Analytics | `/analytics` | Revenue trends, top products | Summary |
+| Leaderboard | `/analytics/leaderboard` | Toggle: Sales/Campaign view | Summary |
 
 ---
 
@@ -194,6 +202,7 @@ When an order is **CREATED**:
 | `OrderDetailsDialog` | `src/components/` | View-only order receipt dialog |
 | `OrderEditModal` | `src/components/` | Edit order products + date |
 | `DashboardLayout` | `src/components/` | Sidebar + TopBar wrapper |
+| `OrderFilters` | `src/components/` | Reusable filter bar (search, date, sort) |
 | `AuthContext` | `src/contexts/` | JWT storage, user state, login/logout |
 
 ---
@@ -201,12 +210,16 @@ When an order is **CREATED**:
 ## Recent Changes (Dec 2025)
 
 1. **Campaign Period** - Added startDate/endDate with period display column
-2. **Delete Confirmation** - Custom modal with 5-second undo toast
+2. **Delete Confirmation** - Custom modal with robust 5-second undo toast (Campaigns & Orders)
 3. **Session Persistence** - Token retained across page refresh
 4. **Order UI Standardization** - Separate view dialog and edit modal
 5. **User Deactivation** - Last admin protection, inactive filtering
 6. **Role-Based UI** - Order management hidden from sales persons
 7. **CORS Fix** - Fixed localhost and 127.0.0.1 origin handling
+8. **Payouts UI Refinement** - Interactive campaign cards with summary view
+9. **Auto-Generated IDs** - Human-readable IDs (Ref) for campaigns and orders with atomic counters
+10. **Leaderboard Real Data** - Integrated real API data with Month/YTD/All-Time filters
+11. **Order Advanced Filters** - Enhanced order list with text search, date ranges, and sorting hooks
 
 ---
 
@@ -273,3 +286,12 @@ npm run build
 - **API Types**: `src/lib/api.ts`
 - **Prisma Schema**: `backend/prisma/schema.prisma`
 - **Auth Middleware**: `backend/src/middleware/auth.ts`
+
+---
+
+## Spec Workflows
+
+Follow these guides for creating new features:
+- **Phase 1 (Shape)**: `agent-os/commands/shape-spec/shape-spec.md`
+- **Phase 2 (Write)**: `agent-os/commands/write-spec/write-spec.md`
+- **Phase 3 (Tasks)**: `agent-os/commands/create-tasks/create-tasks.md`

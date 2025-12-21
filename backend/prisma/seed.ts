@@ -10,8 +10,13 @@ async function main() {
     await prisma.order.deleteMany();
     await prisma.campaign.deleteMany();
     await prisma.user.deleteMany();
+    await prisma.counter.deleteMany(); // Clear counters for fresh referenceIds
 
     console.log('🧹 Cleaned existing data');
+
+    // Track counters for generating referenceIds
+    const campaignCounters: Record<string, number> = { facebook: 0, instagram: 0 };
+    const orderCounters: Record<string, number> = {};
 
     // Hash passwords
     const hashPassword = async (password: string) => {
@@ -93,11 +98,19 @@ async function main() {
         },
     ];
 
-    const campaigns: { id: string; salesPersonId: string; title: string }[] = [];
+    const campaigns: { id: string; referenceId: string; salesPersonId: string; title: string }[] = [];
     for (let i = 0; i < campaignsData.length; i++) {
         const salesPerson = salesPersons[i % salesPersons.length];
+        const platform = campaignsData[i].platform;
+
+        // Generate referenceId
+        campaignCounters[platform]++;
+        const prefix = platform === 'facebook' ? 'FB' : 'IG';
+        const referenceId = `${prefix}-${campaignCounters[platform].toString().padStart(3, '0')}`;
+
         const campaign = await prisma.campaign.create({
             data: {
+                referenceId,
                 title: campaignsData[i].title,
                 platform: campaignsData[i].platform,
                 type: campaignsData[i].type,
@@ -109,7 +122,7 @@ async function main() {
             },
         });
         campaigns.push(campaign);
-        console.log(`✅ Created campaign: ${campaign.title} -> ${salesPerson.username} (${campaignsData[i].status})`);
+        console.log(`✅ Created campaign: ${referenceId} - ${campaign.title} -> ${salesPerson.username} (${campaignsData[i].status})`);
     }
 
     // Create Orders across multiple months
@@ -144,8 +157,16 @@ async function main() {
                 const snapshotRate = salesPerson?.commissionRate || 10;
                 const commissionAmount = orderTotal * (snapshotRate / 100);
 
+                // Generate order referenceId
+                if (!orderCounters[campaign.referenceId]) {
+                    orderCounters[campaign.referenceId] = 0;
+                }
+                orderCounters[campaign.referenceId]++;
+                const orderReferenceId = `${campaign.referenceId}-${orderCounters[campaign.referenceId].toString().padStart(2, '0')}`;
+
                 await prisma.order.create({
                     data: {
+                        referenceId: orderReferenceId,
                         campaignId: campaign.id,
                         products: productSet,
                         orderTotal,
@@ -176,8 +197,16 @@ async function main() {
         const snapshotRate = salesPerson?.commissionRate || 10;
         const commissionAmount = orderTotal * (snapshotRate / 100);
 
+        // Generate order referenceId
+        if (!orderCounters[campaign.referenceId]) {
+            orderCounters[campaign.referenceId] = 0;
+        }
+        orderCounters[campaign.referenceId]++;
+        const orderReferenceId = `${campaign.referenceId}-${orderCounters[campaign.referenceId].toString().padStart(2, '0')}`;
+
         await prisma.order.create({
             data: {
+                referenceId: orderReferenceId,
                 campaignId: campaign.id,
                 products: productSet,
                 orderTotal,
@@ -191,6 +220,21 @@ async function main() {
     }
 
     console.log(`✅ Created ${orderCount} orders across 3 months`);
+
+    // PERSIST COUNTERS to Database
+    console.log('📝 Persisting counters...');
+
+    // Campaign counters
+    await prisma.counter.create({ data: { id: 'campaign_facebook', seq: campaignCounters.facebook } });
+    await prisma.counter.create({ data: { id: 'campaign_instagram', seq: campaignCounters.instagram } });
+
+    // Order counters
+    for (const [refId, count] of Object.entries(orderCounters)) {
+        await prisma.counter.create({
+            data: { id: `order_${refId}`, seq: count }
+        });
+    }
+    console.log(`✅ Persisted ${2 + Object.keys(orderCounters).length} counters`);
 
     console.log('\n🎉 Seed completed successfully!');
     console.log('\n📋 Login credentials:');

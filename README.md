@@ -1,73 +1,144 @@
-# Welcome to your Lovable project
+# Pebble Sales Hub
 
-## Project info
+Pebble Sales Hub is a professional sales commission tracking system designed for businesses selling products through social media campaigns (Facebook, Instagram). It replaces manual spreadsheets with a high-performance web application, providing real-time tracking of sales person performance and accurate commission payouts.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 🚀 Key Features
 
-## How can I edit this code?
+- **Campaign Management**: Track performance across Facebook and Instagram (Live, Posts, Events).
+- **Order Tracking**: captured directly under campaigns with automated commission snapshots.
+- **Commission Snapshot Logic**: Accurately calculates payouts by locking the commission rate at the time of sale, protecting against future rate changes.
+- **Payout Reports**: Detailed monthly and yearly commission breakdown for sales persons.
+- **Sales Leaderboard**: Real-time performance ranking by Sales Person or Campaign.
+- **Human-Readable IDs**: Automatic generation of professional reference IDs (e.g., `FB-001`, `FB-001-01`).
+- **Data Integrity**: 5-second undo window for deletions and comprehensive admin protections.
 
-There are several ways of editing your application.
+## 🛠️ Tech Stack
 
-**Use Lovable**
+### Frontend
+- **React 18** with **TypeScript** & **Vite**
+- **Tailwind CSS** & **shadcn/ui** for premium styling
+- **TanStack Query** for efficient data fetching
+- **Recharts** for interactive data visualization
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### Backend
+- **Node.js** & **Express** with **TypeScript**
+- **MongoDB** with **Prisma ORM**
+- **JWT Authentication** (jsonwebtoken + bcryptjs)
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## 💻 Getting Started
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Prerequisites
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Node.js 18+**
+- **Docker Desktop** (for running MongoDB locally)
 
-Follow these steps:
+### Step 1: Clone and Install
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+# Clone the repository
+git clone <your-repo-url>
+cd sales-hub
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Install Frontend dependencies
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+# Install Backend dependencies
+cd backend
+npm install
 ```
 
-**Edit a file directly in GitHub**
+### Step 2: Environment Setup
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. **Frontend**: The frontend uses `http://localhost:3000/api` by default. Copy `.env.example` to `.env` in the root directory if you need to change this.
+2. **Backend**: Copy `backend/.env.example` to `backend/.env` and update the `JWT_SECRET`.
 
-**Use GitHub Codespaces**
+### Step 3: Run the Database
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The project uses MongoDB. Start the local instance using Docker:
 
-## What technologies are used for this project?
+```bash
+cd backend
+docker-compose up -d
+```
 
-This project is built with:
+### Step 4: Initialize the Database
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```bash
+cd backend
+# Generate Prisma client
+npx prisma generate
+# Push the schema to MongoDB
+npm run prisma:push
+# Seed with initial test data (Admin/Sales accounts)
+npm run seed
+```
 
-## How can I deploy this project?
+### Step 5: Start the Application
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Open two terminal windows:
 
-## Can I connect a custom domain to my Lovable project?
+**Terminal 1 (Backend)**:
+```bash
+cd backend
+npm run dev
+```
+*Backend runs at `http://localhost:3000`*
 
-Yes, you can!
+**Terminal 2 (Frontend)**:
+```bash
+# From the root directory
+npm run dev
+```
+*Frontend runs at `http://localhost:8080`*
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 🍎 Cross-Platform Support (macOS/Linux)
+
+While the project is designed to be cross-platform, users on macOS or Linux might encounter these common issues:
+
+### 1. MongoDB Replica Set Initialization
+Prisma requires a replica set for transactions. If you see connection errors:
+```bash
+docker exec -it pebble-mongodb mongosh --eval "rs.initiate()"
+```
+
+### 2. Apple Silicon (M1/M2/M3)
+If the MongoDB container crashes or performs poorly, ensure you are using a modern Docker Desktop version. You can also explicitly set the platform in `docker-compose.yml`:
+```yaml
+services:
+  mongodb:
+    platform: linux/amd64
+```
+
+### 3. Case-Sensitivity (Linux)
+Linux file systems are case-sensitive. Ensure all `import` statements exactly match the filename casing (e.g., `App.tsx` vs `app.tsx`).
+
+### 4. Native Modules
+If moving the project between different operating systems, **always** delete `node_modules` and run `npm install` to rebuild native binaries like `bcrypt`.
+
+---
+
+## 🔑 Test Credentials
+
+After running the seed script, you can log in with:
+
+| Role | Username | Password |
+|------|----------|----------|
+| **Admin** | `admin` | `admin123` |
+| **Sales** | `sarah.j` | `password123` |
+
+---
+
+## 📂 Project Structure
+
+- `/src`: Frontend application (Pages, Components, Contexts)
+- `/backend`: Node.js API, Prisma schema, and seed data
+- `/agent-os`: Project roadmap and technical specifications
+- `/requirements`: Business rules and original project scope
+
+## 📄 License
+
+This project is proprietary and intended for internal use by Pebble Tech.

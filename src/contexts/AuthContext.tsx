@@ -8,6 +8,7 @@ export interface User {
   username: string;
   role: 'admin' | 'sales';
   commissionRate?: number;
+  avatar?: string;
   status: 'active' | 'inactive';
 }
 

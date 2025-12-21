@@ -122,6 +122,16 @@ export const OrderForm = ({
                 )}
             </div>
 
+            {/* Reference ID Info */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-secondary/30 p-3 rounded-lg border border-border/50">
+                <Info className="w-4 h-4 text-primary" />
+                <span>
+                    {selectedCampaign
+                        ? <>Reference ID will be generated as: <span className="font-mono text-foreground font-medium">{selectedCampaign.referenceId}-XX</span></>
+                        : "Reference ID will be auto-generated upon creation"}
+                </span>
+            </div>
+
             {/* Sales Person Info */}
             {linkedSalesPerson && (
                 <div className="flex items-start gap-3 p-4 rounded-lg bg-primary/5 border border-primary/20">

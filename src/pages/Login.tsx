@@ -40,7 +40,7 @@ const Login = () => {
               <LogIn className="w-6 h-6 text-primary-foreground" />
             </div>
             <h1 className="text-2xl font-bold text-foreground">Welcome Back</h1>
-            <p className="text-muted-foreground mt-1">Sign in to CommissionPro</p>
+            <p className="text-muted-foreground mt-1">Sign in to Pebble Sales Tracker</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

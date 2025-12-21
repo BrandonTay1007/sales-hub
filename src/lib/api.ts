@@ -33,6 +33,7 @@ export interface LoginResponse {
         username: string;
         role: 'admin' | 'sales';
         commissionRate?: number;
+        avatar?: string;
         status: 'active' | 'inactive';
     };
 }
@@ -43,6 +44,7 @@ export interface User {
     username: string;
     role: 'admin' | 'sales';
     commissionRate: number;
+    avatar?: string;
     status: 'active' | 'inactive';
     createdAt: string;
     updatedAt: string;
@@ -50,6 +52,7 @@ export interface User {
 
 export interface Campaign {
     id: string;
+    referenceId: string; // Human-readable ID, e.g., "FB-001", "IG-002"
     title: string;
     platform: 'facebook' | 'instagram';
     type: 'post' | 'event' | 'live';
@@ -71,6 +74,7 @@ export interface Product {
 
 export interface Order {
     id: string;
+    referenceId: string; // Human-readable ID, e.g., "FB-001-01"
     campaignId: string;
     campaign?: Campaign;
     products: Product[];

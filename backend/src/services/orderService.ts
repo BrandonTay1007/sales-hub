@@ -1,6 +1,7 @@
 import prisma from '../lib/prisma';
 import { ValidationError, NotFoundError, ForbiddenError } from '../middleware/errorHandler';
 import { calculateOrderTotal, calculateCommission, validateProducts, Product } from '../utils/commission';
+import { counterService } from './counterService';
 
 // Type definitions
 type OrderStatus = 'active' | 'cancelled';
@@ -64,6 +65,7 @@ export const orderService = {
                 campaign: {
                     select: {
                         id: true,
+                        referenceId: true,
                         title: true,
                         salesPersonId: true,
                     },
@@ -85,6 +87,7 @@ export const orderService = {
                 campaign: {
                     select: {
                         id: true,
+                        referenceId: true,
                         title: true,
                         salesPersonId: true,
                         salesPerson: {
@@ -122,7 +125,7 @@ export const orderService = {
             throw new ValidationError(validation.error!);
         }
 
-        // Get campaign with sales person info
+        // Get campaign with sales person info and referenceId
         const campaign = await prisma.campaign.findUnique({
             where: { id: data.campaignId },
             include: {
@@ -151,9 +154,13 @@ export const orderService = {
         const snapshotRate = campaign.salesPerson.commissionRate;
         const commissionAmount = calculateCommission(orderTotal, snapshotRate);
 
+        // Generate referenceId using campaign's referenceId
+        const referenceId = await counterService.generateOrderReferenceId(campaign.referenceId);
+
         // Create order
         const order = await prisma.order.create({
             data: {
+                referenceId,
                 campaignId: data.campaignId,
                 products: validation.products!,
                 orderTotal,
@@ -165,6 +172,7 @@ export const orderService = {
                 campaign: {
                     select: {
                         id: true,
+                        referenceId: true,
                         title: true,
                     },
                 },
@@ -232,6 +240,7 @@ export const orderService = {
                 campaign: {
                     select: {
                         id: true,
+                        referenceId: true,
                         title: true,
                     },
                 },

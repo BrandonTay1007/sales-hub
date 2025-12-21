@@ -73,7 +73,14 @@ export const OrderDetailsDialog = ({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Order Details</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                        Order Details
+                        {order.referenceId && (
+                            <span className="text-sm font-mono font-normal text-muted-foreground bg-secondary px-2 py-0.5 rounded">
+                                {order.referenceId}
+                            </span>
+                        )}
+                    </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-4">

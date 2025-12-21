@@ -346,12 +346,12 @@ const PayoutsPage = () => {
             </div>
           ) : (
             campaignBreakdown.map((breakdown) => (
-              <div key={breakdown.campaign.id} className="dashboard-card">
+              <div key={breakdown.campaign.id} className={`dashboard-card cursor-pointer transition-all duration-200 hover:border-primary/50 ${expandedCampaign === breakdown.campaign.id ? 'ring-2 ring-primary/20' : ''}`}
+                onClick={() => setExpandedCampaign(
+                  expandedCampaign === breakdown.campaign.id ? null : breakdown.campaign.id
+                )}>
                 <div
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => setExpandedCampaign(
-                    expandedCampaign === breakdown.campaign.id ? null : breakdown.campaign.id
-                  )}
+                  className="flex items-center justify-between"
                 >
                   <div>
                     <button
@@ -361,15 +361,7 @@ const PayoutsPage = () => {
                       {breakdown.campaign.title}
                     </button>
                     <p className="text-sm text-muted-foreground">
-                      {breakdown.orders.length} orders •
-                      <Tooltip>
-                        <TooltipTrigger className="ml-1 underline decoration-dotted">
-                          Avg Rate: {breakdown.avgRate.toFixed(1)}%
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Average snapshot rate used for this campaign's orders</p>
-                        </TooltipContent>
-                      </Tooltip>
+                      {breakdown.orders.length} orders
                     </p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -386,52 +378,85 @@ const PayoutsPage = () => {
                 </div>
 
                 {/* Inline Order Breakdown - Click to expand */}
-                {expandedCampaign === breakdown.campaign.id && breakdown.orders.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <p className="text-xs text-muted-foreground mb-2">Order Details</p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border">
-                            <th className="text-left py-2 text-muted-foreground font-medium">Date</th>
-                            <th className="text-left py-2 text-muted-foreground font-medium">Products</th>
-                            <th className="text-right py-2 text-muted-foreground font-medium">Sales</th>
-                            <th className="text-right py-2 text-muted-foreground font-medium">
-                              <Tooltip>
-                                <TooltipTrigger>Rate</TooltipTrigger>
-                                <TooltipContent>Snapshot rate at order time</TooltipContent>
-                              </Tooltip>
-                            </th>
-                            <th className="text-right py-2 text-muted-foreground font-medium">Commission</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {breakdown.orders.map((order) => (
-                            <tr key={order.id} className="border-b border-border/50">
-                              <td className="py-2">{order.createdAt.split('T')[0]}</td>
-                              <td className="py-2 text-muted-foreground text-xs">
-                                {order.products.map(p => `${p.name} (${p.qty})`).join(', ')}
+                {expandedCampaign === breakdown.campaign.id && (
+                  <div className="mt-4 pt-4 border-t border-border animate-in fade-in slide-in-from-top-2">
+
+                    {/* Summary Stats Grid */}
+                    <div className="grid grid-cols-3 gap-4 mb-6 bg-muted/50 p-4 rounded-lg">
+                      <div className="text-center sm:text-left">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Total Sales</p>
+                        <p className="font-bold text-lg mt-1">RM {breakdown.totalSales.toFixed(2)}</p>
+                      </div>
+                      <div className="text-center sm:text-left">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Commission</p>
+                        <p className="font-bold text-lg mt-1 text-success">RM {breakdown.totalCommission.toFixed(2)}</p>
+                      </div>
+                      <div className="text-center sm:text-left">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold flex items-center gap-1 justify-center sm:justify-start">
+                          Avg Rate
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <span className="cursor-help text-muted-foreground/70">ⓘ</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Average snapshot rate used for this campaign's orders
+                            </TooltipContent>
+                          </Tooltip>
+                        </p>
+                        <p className="font-bold text-lg mt-1">{breakdown.avgRate.toFixed(1)}%</p>
+                      </div>
+                    </div>
+
+                    <h4 className="text-sm font-medium mb-3 text-muted-foreground">Order Details</h4>
+                    {breakdown.orders.length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic text-center py-4">No orders yet.</p>
+                    ) : (
+                      <div className="overflow-x-auto max-h-[300px] overflow-y-auto pr-2">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 bg-background z-10">
+                            <tr className="border-b border-border shadow-sm">
+                              <th className="text-left py-2 text-muted-foreground font-medium w-24 bg-background">Ref</th>
+                              <th className="text-left py-2 text-muted-foreground font-medium bg-background">Date</th>
+                              <th className="text-left py-2 text-muted-foreground font-medium bg-background">Products</th>
+                              <th className="text-right py-2 text-muted-foreground font-medium bg-background">Sales</th>
+                              <th className="text-right py-2 text-muted-foreground font-medium bg-background">
+                                <Tooltip>
+                                  <TooltipTrigger>Rate</TooltipTrigger>
+                                  <TooltipContent>Snapshot rate at order time</TooltipContent>
+                                </Tooltip>
+                              </th>
+                              <th className="text-right py-2 text-muted-foreground font-medium bg-background">Commission</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {breakdown.orders.map((order) => (
+                              <tr key={order.id} className="border-b border-border/50">
+                                <td className="py-2 font-mono text-xs text-muted-foreground">{order.referenceId}</td>
+                                <td className="py-2">{order.createdAt.split('T')[0]}</td>
+                                <td className="py-2 text-muted-foreground text-xs">
+                                  {order.products.map(p => `${p.name} (${p.qty})`).join(', ')}
+                                </td>
+                                <td className="py-2 text-right">RM {order.orderTotal.toFixed(2)}</td>
+                                <td className="py-2 text-right text-primary">{order.snapshotRate}%</td>
+                                <td className="py-2 text-right font-medium text-success">
+                                  RM {order.commissionAmount.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="sticky bottom-0 bg-secondary/30">
+                            <tr>
+                              <td className="py-2 font-medium" colSpan={4}>
+                                Total: RM {breakdown.totalSales.toFixed(2)} × {breakdown.avgRate.toFixed(1)}%
                               </td>
-                              <td className="py-2 text-right">RM {order.orderTotal.toFixed(2)}</td>
-                              <td className="py-2 text-right text-primary">{order.snapshotRate}%</td>
-                              <td className="py-2 text-right font-medium text-success">
-                                RM {order.commissionAmount.toFixed(2)}
+                              <td className="py-2 text-right font-bold text-success" colSpan={2}>
+                                = RM {breakdown.totalCommission.toFixed(2)}
                               </td>
                             </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-secondary/30">
-                            <td className="py-2 font-medium" colSpan={3}>
-                              Total: RM {breakdown.totalSales.toFixed(2)} × {breakdown.avgRate.toFixed(1)}%
-                            </td>
-                            <td className="py-2 text-right font-bold text-success" colSpan={2}>
-                              = RM {breakdown.totalCommission.toFixed(2)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
+                          </tfoot>
+                        </table>
+                      </div>
+                    )}
                     <div className="mt-4 text-center">
                       <button
                         onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
@@ -441,12 +466,6 @@ const PayoutsPage = () => {
                       </button>
                     </div>
                   </div>
-                )}
-
-                {breakdown.orders.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-2 text-center">
-                    {expandedCampaign === breakdown.campaign.id ? 'Click to collapse' : 'Click to see order details'}
-                  </p>
                 )}
               </div>
             ))

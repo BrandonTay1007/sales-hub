@@ -184,6 +184,7 @@ const Dashboard = () => {
       const productName = order.products[0]?.name || 'Item';
       return {
         id: order.id,
+        referenceId: order.referenceId,
         text: `Sold '${productName}'`,
         campaignTitle: campaign?.title || 'Campaign',
         amount: order.orderTotal,
@@ -491,7 +492,14 @@ const Dashboard = () => {
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
                     <div>
-                      <span className="text-sm text-foreground">{activity.text}</span>
+                      <div className="flex items-center gap-1.5">
+                        {activity.referenceId && (
+                          <span className="text-xs font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                            {activity.referenceId}
+                          </span>
+                        )}
+                        <span className="text-sm text-foreground">{activity.text}</span>
+                      </div>
                       {isAdmin && activity.salesPerson && (
                         <p className="text-xs text-muted-foreground">{activity.salesPerson}</p>
                       )}

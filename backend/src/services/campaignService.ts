@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma';
 import { ValidationError, NotFoundError, ForbiddenError } from '../middleware/errorHandler';
+import { counterService } from './counterService';
 
 // Type definitions matching Prisma schema
 type Platform = 'facebook' | 'instagram';
@@ -57,6 +58,7 @@ export const campaignService = {
 
         return campaigns.map((c) => ({
             id: c.id,
+            referenceId: c.referenceId,
             title: c.title,
             platform: c.platform,
             type: c.type,
@@ -114,6 +116,7 @@ export const campaignService = {
 
         return {
             id: campaign.id,
+            referenceId: campaign.referenceId,
             title: campaign.title,
             platform: campaign.platform,
             type: campaign.type,
@@ -148,8 +151,12 @@ export const campaignService = {
             throw new ValidationError('Campaign must be assigned to a user with sales role');
         }
 
+        // Generate referenceId
+        const referenceId = await counterService.generateCampaignReferenceId(data.platform);
+
         const campaign = await prisma.campaign.create({
             data: {
+                referenceId,
                 title: data.title,
                 platform: data.platform,
                 type: data.type,

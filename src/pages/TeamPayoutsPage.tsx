@@ -397,7 +397,10 @@ const AdminTeamPayouts = () => {
                                       onClick={(e) => { e.stopPropagation(); navigate(`/campaigns/${breakdown.campaign.id}`); }}
                                     >
                                       <div className="flex items-center justify-between mb-2">
-                                        <span className="font-medium text-foreground hover:text-primary">
+                                        <span className="font-medium text-foreground hover:text-primary flex items-center gap-2">
+                                          <span className="text-xs font-mono text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                                            {breakdown.campaign.referenceId}
+                                          </span>
                                           {breakdown.campaign.title}
                                         </span>
                                         <span className="text-success font-semibold">

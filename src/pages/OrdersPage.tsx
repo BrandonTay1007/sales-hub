@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { ordersApi, campaignsApi, usersApi, type Order, type Campaign, type User, type Product, getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Filter, ArrowUpDown, ShoppingCart, X, Facebook, Instagram, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Download, ShoppingCart, X, Facebook, Instagram, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,8 +11,8 @@ import { OrderForm } from '@/components/OrderForm';
 import { OrderDetailsDialog, formatProductsSummary } from '@/components/OrderDetailsDialog';
 import { OrderEditModal } from '@/components/OrderEditModal';
 import { ConfirmDeleteDialog } from '@/components/ConfirmDeleteDialog';
-
-type SortOption = 'latest' | 'oldest' | 'highest' | 'lowest';
+import { useOrderFilters } from '@/hooks/useOrderFilters';
+import { OrderFilters } from '@/components/OrderFilters';
 
 const OrdersPage = () => {
   const { user, isAdmin } = useAuth();
@@ -23,14 +23,6 @@ const OrdersPage = () => {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; timer: ReturnType<typeof setTimeout> } | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>('latest');
-
-  // Filters
-  const [filterCampaign, setFilterCampaign] = useState('');
-  const [filterSalesPerson, setFilterSalesPerson] = useState('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'week' | 'month'>('all');
 
   // Fetch all required data
   const { data: orders = [], isLoading: ordersLoading, error: ordersError } = useQuery({
@@ -58,7 +50,7 @@ const OrdersPage = () => {
       if (!response.success) throw new Error(getErrorMessage(response));
       return response.data || [];
     },
-    enabled: isAdmin, // Only fetch for admin - sales persons get 403
+    enabled: isAdmin,
   });
 
   // Create lookup maps
@@ -88,53 +80,6 @@ const OrdersPage = () => {
 
   const availableCampaigns = isAdmin ? campaigns : userCampaigns;
   const activeCampaigns = availableCampaigns.filter(c => (c as Campaign & { status?: string }).status !== 'completed');
-
-  // Filter and sort orders
-  const filteredOrders = useMemo(() => {
-    let filtered = isAdmin
-      ? orders
-      : orders.filter(o => userCampaigns.some(c => c.id === o.campaignId));
-
-    // Apply quick filters
-    const now = new Date();
-    if (quickFilter === 'week') {
-      const weekAgo = new Date(now);
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      filtered = filtered.filter(o => new Date(o.createdAt) >= weekAgo);
-    } else if (quickFilter === 'month') {
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      filtered = filtered.filter(o => new Date(o.createdAt) >= monthStart);
-    }
-
-    // Apply other filters
-    filtered = filtered.filter(order => {
-      if (filterCampaign && order.campaignId !== filterCampaign) return false;
-      if (filterSalesPerson) {
-        const campaign = campaignsMap.get(order.campaignId);
-        if (!campaign || campaign.salesPersonId !== filterSalesPerson) return false;
-      }
-      const orderDate = order.createdAt.split('T')[0];
-      if (filterDateFrom && orderDate < filterDateFrom) return false;
-      if (filterDateTo && orderDate > filterDateTo) return false;
-      return true;
-    });
-
-    // Apply sorting
-    return filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'latest':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        case 'oldest':
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        case 'highest':
-          return b.orderTotal - a.orderTotal;
-        case 'lowest':
-          return a.orderTotal - b.orderTotal;
-        default:
-          return 0;
-      }
-    });
-  }, [orders, filterCampaign, filterSalesPerson, filterDateFrom, filterDateTo, quickFilter, isAdmin, userCampaigns, sortBy, campaignsMap]);
 
   // Mutations
   const createOrderMutation = useMutation({
@@ -187,15 +132,20 @@ const OrdersPage = () => {
     },
   });
 
-  const clearFilters = () => {
-    setFilterCampaign('');
-    setFilterSalesPerson('');
-    setFilterDateFrom('');
-    setFilterDateTo('');
-    setQuickFilter('all');
-  };
+  // Use the new hook for filtering and sorting
+  const {
+    filteredOrders,
+    filters,
+    setters,
+    clearFilters,
+    hasFilters
+  } = useOrderFilters({
+    orders,
+    campaignsMap,
+    isAdmin,
+    userCampaigns: isAdmin ? [] : userCampaigns
+  });
 
-  const hasFilters = filterCampaign || filterSalesPerson || filterDateFrom || filterDateTo || quickFilter !== 'all';
   const isLoading = ordersLoading || campaignsLoading || (isAdmin && usersLoading);
 
   const handleDeleteOrder = (orderId: string, e?: React.MouseEvent) => {
@@ -208,24 +158,24 @@ const OrdersPage = () => {
     const orderId = deleteOrderId;
     setDeleteOrderId(null);
 
+    let timer: NodeJS.Timeout;
+
     // Show undo toast with 5-second window
-    const toastId = toast.success('Order deleted', {
+    const toastId = toast('Order will be deleted in 5 seconds', {
       action: {
         label: 'Undo',
         onClick: () => {
-          if (pendingDelete?.timer) {
-            clearTimeout(pendingDelete.timer);
-            setPendingDelete(null);
-            toast.dismiss(toastId);
-            toast.info('Deletion cancelled');
-          }
+          clearTimeout(timer);
+          setPendingDelete(null);
+          toast.dismiss(toastId);
+          toast.info('Deletion cancelled');
         },
       },
       duration: 5000,
     });
 
     // Set timeout for actual deletion after 5 seconds
-    const timer = setTimeout(() => {
+    timer = setTimeout(() => {
       deleteOrderMutation.mutate(orderId);
       setPendingDelete(null);
     }, 5000);
@@ -275,82 +225,15 @@ const OrdersPage = () => {
         </div>
 
         {/* Filters */}
-        <div className="dashboard-card">
-          <div className="flex items-center gap-2 mb-4">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            <span className="font-medium text-foreground">Filters</span>
-            {hasFilters && (
-              <button onClick={clearFilters} className="text-xs text-primary hover:underline ml-auto">
-                Clear all
-              </button>
-            )}
-          </div>
-
-          {/* Quick Filter Toggles */}
-          <div className="flex gap-2 mb-4">
-            {(['all', 'week', 'month'] as const).map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setQuickFilter(filter)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${quickFilter === filter
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
-                  }`}
-              >
-                {filter === 'all' ? 'All Time' : filter === 'week' ? 'This Week' : 'This Month'}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="form-label">Campaign</label>
-              <select
-                value={filterCampaign}
-                onChange={(e) => setFilterCampaign(e.target.value)}
-                className="form-select"
-              >
-                <option value="">All Campaigns</option>
-                {availableCampaigns.map(c => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
-                ))}
-              </select>
-            </div>
-            {isAdmin && (
-              <div>
-                <label className="form-label">Sales Person</label>
-                <select
-                  value={filterSalesPerson}
-                  onChange={(e) => setFilterSalesPerson(e.target.value)}
-                  className="form-select"
-                >
-                  <option value="">All Sales Persons</option>
-                  {salesPersons.map(sp => (
-                    <option key={sp.id} value={sp.id}>{sp.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div>
-              <label className="form-label">From Date</label>
-              <input
-                type="date"
-                value={filterDateFrom}
-                onChange={(e) => setFilterDateFrom(e.target.value)}
-                className="form-input"
-              />
-            </div>
-            <div>
-              <label className="form-label">To Date</label>
-              <input
-                type="date"
-                value={filterDateTo}
-                onChange={(e) => setFilterDateTo(e.target.value)}
-                className="form-input"
-              />
-            </div>
-          </div>
-        </div>
+        <OrderFilters
+          filters={filters}
+          setters={setters}
+          onClear={clearFilters}
+          hasFilters={hasFilters}
+          isAdmin={isAdmin}
+          userCampaigns={availableCampaigns}
+          salesUsers={salesPersons}
+        />
 
         {/* Orders Table */}
         <div className="dashboard-card overflow-hidden p-0">
@@ -358,24 +241,12 @@ const OrdersPage = () => {
             <span className="text-sm text-muted-foreground">
               {isLoading ? <Skeleton className="h-4 w-20" /> : `${filteredOrders.length} orders`}
             </span>
-            <div className="flex items-center gap-2">
-              <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="form-select w-auto text-sm py-1"
-              >
-                <option value="latest">Latest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="highest">Highest Value</option>
-                <option value="lowest">Lowest Value</option>
-              </select>
-            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-secondary/50">
                 <tr>
+                  <th className="table-header">Ref</th>
                   <th className="table-header">Date</th>
                   <th className="table-header">Campaign</th>
                   <th className="table-header">Products</th>
@@ -389,6 +260,7 @@ const OrdersPage = () => {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="table-row">
+                      <td className="table-cell"><Skeleton className="h-4 w-20" /></td>
                       <td className="table-cell"><Skeleton className="h-4 w-24" /></td>
                       <td className="table-cell"><Skeleton className="h-4 w-32" /></td>
                       <td className="table-cell"><Skeleton className="h-4 w-28" /></td>
@@ -400,7 +272,7 @@ const OrdersPage = () => {
                   ))
                 ) : filteredOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={isAdmin ? 7 : 5} className="table-cell text-center text-muted-foreground py-8">
+                    <td colSpan={isAdmin ? 8 : 6} className="table-cell text-center text-muted-foreground py-8">
                       No orders found
                     </td>
                   </tr>
@@ -415,6 +287,7 @@ const OrdersPage = () => {
                         className="table-row cursor-pointer hover:bg-secondary/70"
                         onClick={() => setViewingOrder(order)}
                       >
+                        <td className="table-cell font-mono text-xs text-muted-foreground">{order.referenceId}</td>
                         <td className="table-cell">{order.createdAt.split('T')[0]}</td>
                         <td className="table-cell">
                           <div className="flex items-center gap-2">

@@ -109,12 +109,22 @@ IF you have concluded that this task has been completed, then mark it's checkbox
 IF you have concluded that this task has NOT been completed, then mark this checkbox with ⚠️ and note it's incompleteness in your verification report.
 
 
-### Step 2: Update roadmap (if applicable)
+### Step 2: Update Agent Context
+
+Open `agent-os/specs/prompts/agent-context.md` and update it to reflect any changes made during this implementation.
+Pay attention to:
+- **Recent Changes**: Add a new item for the implemented feature.
+- **Data Models**: Update if schema changed.
+- **Tech Stack**: Update if new tech added.
+- **API Endpoints**: Add new endpoints.
+
+
+### Step 3: Update roadmap (if applicable)
 
 Open `agent-os/product/roadmap.md` and check to see whether any item(s) match the description of the current spec that has just been implemented.  If so, then ensure that these item(s) are marked as completed by updating their checkbox(s) to `- [x]`.
 
 
-### Step 3: Run entire tests suite
+### Step 4: Run entire tests suite
 
 Run the entire tests suite for the application so that ALL tests run.  Verify how many tests are passing and how many have failed or produced errors.
 
@@ -123,7 +133,7 @@ Include these counts and the list of failed tests in your final verification rep
 DO NOT attempt to fix any failing tests.  Just note their failures in your final verification report.
 
 
-### Step 4: Create final verification report
+### Step 5: Create final verification report
 
 Create your final verification report in `agent-os/specs/[this-spec]/verifications/final-verification.html`.
 
@@ -166,6 +176,7 @@ The content of this report should follow this structure:
 **Status:** ✅ Complete | ⚠️ Issues Found
 
 ### Implementation Documentation
+- [x] Agent Context Update: `agent-os/specs/prompts/agent-context.md`
 - [x] Task Group 1 Implementation: `implementations/1-[task-name]-implementation.md`
 - [x] Task Group 2 Implementation: `implementations/2-[task-name]-implementation.md`
 
