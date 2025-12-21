@@ -87,39 +87,30 @@ A web-based platform that automates sales tracking, locks commission rates at th
    cd sales-hub
    ```
 
-2. **Start MongoDB with Docker** (recommended)
+2. **Start MongoDB with Docker**
+
+   **Option A: Automated Setup (Recommended)**
    ```bash
-   # Create and start MongoDB container
-   docker run -d \
-     --name pebble-mongodb \
-     -p 27017:27017 \
-     -e MONGO_INITDB_DATABASE=pebble-sales-hub \
-     mongo:6
+   # Windows (PowerShell)
+   .\setup-mongodb.ps1
+   
+   # Mac/Linux
+   chmod +x setup-mongodb.sh
+   ./setup-mongodb.sh
    ```
    
-   Or use Docker Compose (create `docker-compose.yml` in root):
-   ```yaml
-   services:
-     mongodb:
-       image: mongo:7.0
-       container_name: pebble-mongodb
-       ports:
-         - "27017:27017"
-       environment:
-         MONGO_INITDB_DATABASE: pebble-sales-hub
-       volumes:
-         - mongodb_data:/data/db
-       restart: unless-stopped
-       command: ["--replSet", "rs0", "--bind_ip_all"]
+   The script automatically:
+   - Starts MongoDB container
+   - Initializes replica set (if needed)
+   - Checks if already initialized (safe to run multiple times)
    
-   volumes:
-     mongodb_data:
-       driver: local
-   ```
-   
-   Then run:
+   **Option B: Manual Setup**
    ```bash
+   # Start container
    docker-compose up -d
+   
+   # Initialize replica set (only needed once)
+   docker exec -it pebble-mongodb mongosh --eval "rs.initiate()"
    ```
 
 3. **Install frontend dependencies**
@@ -169,6 +160,7 @@ A web-based platform that automates sales tracking, locks commission rates at th
 
 1. **Start the backend server** (from `backend/` directory)
    ```bash
+   cd backend
    npm run dev
    ```
    Backend runs on `http://localhost:3000`
@@ -182,6 +174,67 @@ A web-based platform that automates sales tracking, locks commission rates at th
 3. **Access the application**
    - Open `http://localhost:8080` in your browser
    - Use test credentials below to log in
+
+## Database Management (Optional Developer Tools)
+
+> **Note**: This section is optional. These are developer tools for viewing and managing the database. The application works without them.
+
+### Prisma Studio (Visual Database Browser)
+
+Prisma Studio provides a GUI to view and edit your database:
+
+```bash
+cd backend
+npx prisma studio
+```
+
+This opens a browser at `http://localhost:5555` where you can:
+- View all collections (User, Campaign, Order)
+- Browse and search records
+- Edit data directly
+- Test queries
+
+### Useful Prisma Commands
+
+```bash
+cd backend
+
+# View database in browser GUI
+npx prisma studio
+
+# Generate Prisma Client (after schema changes)
+npx prisma generate
+
+# Push schema changes to database
+npx prisma db push
+
+# Reset database (WARNING: deletes all data)
+npx prisma db push --force-reset
+
+# Re-seed database
+npm run seed
+```
+
+### MongoDB Shell Access
+
+```bash
+# Access MongoDB shell
+docker exec -it pebble-mongodb mongosh
+
+# View databases
+show dbs
+
+# Use pebble-sales-hub database
+use pebble-sales-hub
+
+# View collections
+show collections
+
+# Query examples
+db.User.find()
+db.Campaign.find()
+db.Order.find()
+```
 
 ## Usage
 
@@ -241,6 +294,57 @@ sales-hub/
 └── agent-os/             # Development specifications and AI prompts
 ```
 
+## Testing
+
+The backend includes a comprehensive test suite covering critical business logic and API endpoints.
+
+### Running Tests
+
+```bash
+cd backend
+
+# Run all tests
+npm test
+
+# Run in watch mode (auto-rerun on file changes)
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+### Test Coverage
+
+**Unit Tests:**
+- ✅ Commission calculation logic
+- ✅ Order total calculation
+- ✅ Product validation
+- ✅ Commission snapshot behavior (CRITICAL)
+
+**Integration Tests:**
+- ✅ Authentication endpoints (login, token validation)
+- ✅ User management (CRUD, last admin protection)
+- ✅ Order management (CRUD with commission snapshot)
+
+### Test Structure
+
+```
+backend/tests/
+├── unit/
+│   └── commission.test.ts    # Business logic tests
+└── integration/
+    ├── auth.test.ts          # Auth endpoint tests
+    ├── users.test.ts         # User CRUD tests
+    └── orders.test.ts        # Order CRUD tests
+```
+
+### Writing New Tests
+
+See [backend/README.md](./backend/README.md#testing) for detailed testing documentation including:
+- Test examples (unit and integration)
+- Best practices
+- How to write new tests
+
 ## Documentation
 
 - **[Setup Guide](./docs/README.md)** - Detailed installation and deployment instructions
@@ -254,5 +358,3 @@ sales-hub/
 MIT License - see LICENSE file for details
 
 ---
-
-**Built with ❤️ for efficient sales tracking and fair commission management**

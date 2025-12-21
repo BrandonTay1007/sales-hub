@@ -70,6 +70,89 @@ Server runs at `http://localhost:3000`
 | `npm run prisma:push` | Push schema to database |
 | `npm run seed` | Seed database with test data |
 
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode (auto-rerun on file changes)
+npm run test:watch
+
+# Run with coverage report
+npm run test:coverage
+```
+
+### Test Structure
+
+```
+tests/
+├── unit/                  # Unit tests for business logic
+│   └── commission.test.ts # Commission calculation tests
+└── integration/           # API endpoint tests
+    ├── auth.test.ts      # Authentication endpoints
+    ├── users.test.ts     # User CRUD endpoints
+    └── orders.test.ts    # Order CRUD with commission
+```
+
+### Test Coverage
+
+The test suite covers:
+
+**Unit Tests:**
+- ✅ Commission calculation (`calculateCommission`)
+- ✅ Order total calculation (`calculateOrderTotal`)
+- ✅ Product validation (`validateProducts`)
+- ✅ Commission snapshot logic (CRITICAL business rule)
+
+**Integration Tests:**
+- ✅ Authentication (login, token validation)
+- ✅ User management (CRUD, last admin protection)
+- ✅ Order management (CRUD, commission snapshot)
+
+### Writing New Tests
+
+**Unit Test Example:**
+```typescript
+// tests/unit/myFeature.test.ts
+import { myFunction } from '../../src/utils/myFeature';
+
+describe('My Feature', () => {
+  it('should do something', () => {
+    const result = myFunction(input);
+    expect(result).toBe(expected);
+  });
+});
+```
+
+**Integration Test Example:**
+```typescript
+// tests/integration/myEndpoint.test.ts
+import request from 'supertest';
+import app from '../../src/app';
+
+describe('GET /api/my-endpoint', () => {
+  it('should return data', async () => {
+    const response = await request(app)
+      .get('/api/my-endpoint')
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(response.status).toBe(200);
+    expect(response.body.success).toBe(true);
+  });
+});
+```
+
+### Test Best Practices
+
+1. **Isolation**: Each test should be independent
+2. **Cleanup**: Clean up test data after each test
+3. **Descriptive Names**: Use clear test descriptions
+4. **Coverage**: Aim for >80% coverage on business logic
+5. **Critical Paths**: Always test commission calculation and snapshot logic
+
 ## Environment Variables
 
 Copy `.env.example` to `.env` and configure:
