@@ -3,6 +3,12 @@ import { LayoutDashboard, Users, Megaphone, ShoppingCart, Wallet, LogOut, BarCha
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 
+/**
+ * Get navigation items based on user role
+ * Admin users see full navigation, sales users see limited navigation
+ * @param isAdmin - Whether the current user is an admin
+ * @returns Array of navigation items with title, url, and icon
+ */
 const getNavItems = (isAdmin: boolean) => {
   if (isAdmin) {
     return [
@@ -22,6 +28,12 @@ const getNavItems = (isAdmin: boolean) => {
   ];
 };
 
+/**
+ * AppSidebar Component
+ * Main navigation sidebar for the application
+ * Displays role-based navigation items, user profile, and logout button
+ * Uses framer-motion for active tab animation
+ */
 export const AppSidebar = () => {
   const location = useLocation();
   const { user, logout, isAdmin } = useAuth();
@@ -52,8 +64,8 @@ export const AppSidebar = () => {
                 <Link
                   to={item.url}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all relative ${isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
                     }`}
                 >
                   {isActive && (

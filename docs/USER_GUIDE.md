@@ -1,171 +1,214 @@
-# How to use?
+## This guide provides a comprehensive overview of the **Pebble Sales Hub** application.
 
-[Admins](#admins)
-  [Dashboard](#dashboard)
-  [Campaign](#campaign)
-  [Users](#users)
-  [Orders](#orders)
-  [Payouts](#payouts)
-  [Analytics](#analytics-leaderboard)
+## **Quick Links**
 
-[Sales Person](#sales-person)
-  [Dashboard](#dashboard-1)
-  [Campaign](#campaign-1)
-  [Orders](#orders-1)
-  [Payouts](#payouts-1)
-  [Analytics](#analytics-1)
+- [🔑 Roles & Permissions](https://www.notion.so/Pebble-Sales-Hub-User-Guide-2d01731639308088bda5ce99432e2f09?pvs=21)
+- [🚀 Getting Started](https://www.notion.so/Pebble-Sales-Hub-User-Guide-2d01731639308088bda5ce99432e2f09?pvs=21)
+- [🛡️ Admin Guide](https://www.notion.so/Pebble-Sales-Hub-User-Guide-2d01731639308088bda5ce99432e2f09?pvs=21)
+- [💼 Sales Person Guide](https://www.notion.so/Pebble-Sales-Hub-User-Guide-2d01731639308088bda5ce99432e2f09?pvs=21)
 
 ---
 
-## Admins
+## **🔑 Roles & Permissions**
 
-### Dashboard
+The application supports two distinct user roles:
 
-![Dashboard Screenshot](c:/Users/taywe/.gemini/antigravity/brain/3c9b0379-e688-4f84-b539-bdcc5f230333/uploaded_image_1766295145219.png)
-
-- **Global Metrics Cards**: Real-time snapshot of the current month's performance.
-    - **Total Revenue**: Sum of all order totals for the current month.
-    - **Commissions Owed**: Total outstanding liability to sales staff for the current month.
-    - **Active Campaigns**: Count of campaigns currently running (Status: 'Active').
-    - **Top Performer**: Highlights the #1 sales person by revenue, showing their name and total sales.
-- **Quick Actions**:
-    - **Quick Payout Overview**: A clickable card showing total commissions owed, linking directly to the Team Payouts page for processing.
-- **Visual Analytics**:
-    - **Daily Sales (Last 7 Days)**: Bar chart visualizing sales trends to identify peak days.
-    - **Revenue by Platform**: Donut chart comparing performance between Facebook vs. Instagram.
-- **Recent Activity Feed**: A chronological list of the latest orders placed by the team, useful for spotting activity in real-time.
-
-### Campaign
-
-![Placeholder: Campaign Management Page]
-
-- **Campaign Hub**: Centralized management for all marketing initiatives.
-- **Create Campaign**:
-    - **Fields**: Title, Platform (Select: Facebook/Instagram), Type (Select: Post/Live/Event), Campaign URL.
-    - **Assignment**: Assign a specific Sales Person to own the campaign (they will receive commissions for orders linked to it).
-    - **Scheduling**: Optional Start and End dates.
-- **Campaign Detail View** (Click any campaign to view):
-    - **Order Management Tab**: View, Add, Edit, or Delete orders specific to this campaign.
-    - **Performance Tab**: View aggregated stats like Total Revenue, Items Sold, and Average Order Value.
-    - **Status Control**:
-        - **End Campaign**: Mark an active campaign as 'Completed' (automatically sets End Date to now).
-        - **Reactivate**: Re-open a completed campaign to allow new orders.
-    - **Quick Links**: "View Campaign" link opens the actual social media URL in a new tab.
-
-### Users
-
-![Placeholder: User Management Page]
-
-- **Team Directory**: List of all staff members with sorting and filtering options.
-- **User Management**:
-    - **Create User**:
-        - **Roles**: distinct access levels for **Admin** (Full Access) vs **Sales** (Restricted View).
-        - **Commission Rate**: Slider/Input to set the default commission % for Sales users (0-100%).
-    - **Edit User (Drawer)**:
-        - **Update Details**: Change Name or Username.
-        - **Reset Password**: Admin can manually set a new password.
-        - **Update Commission**: Change the rate for future orders (does not affect past orders).
-    - **Deactivation**:
-        - Toggle user status to **Inactive**.
-        - Prevents login access immediately.
-        - Preserves all historical data (orders, payouts) for reporting.
-
-### Orders
-
-![Placeholder: Order Management Page]
-
-- **Order Ledger**: Comprehensive table of all sales transactions.
-- **Add Order (Manual Entry)**:
-    - **Context**: Select the Campaign (automatically pulls the assigned Sales Person and their current Commission Rate).
-    - **Products**: Dynamic form to add multiple line items (Product Name, Quantity, Price).
-    - **Calculations**: Auto-calculates Order Total and Estimated Commission.
-- **Safety Features**:
-    - **Snapshot Commission**: Stores the commission rate *at the time of order creation*, ensuring rate changes don't affect past payouts.
-    - **Undo Delete**: 5-second "Undo" toast notification after deleting an order to prevent accidental data loss.
-- **Filters**: Filter ledger by Campaign, Sales Person, or Date Range.
-
-### Payouts
-
-![Placeholder: Team Payouts Page]
-
-- **Team Commission View**: Aggregated view for payroll processing.
-- **Period Selector**: Dropdowns for Year and Month to view historical payout data.
-- **Summary Cards**:
-    - **Total Team Sales**: Gross revenue for the selected period.
-    - **Total Commission Payout**: Net liability to be paid out.
-- **Agent Breakdown Table**:
-    - **Rows**: Each active sales person with their Total Earned for the month and YTD (Year-to-Date).
-    - **Expandable Details**: Click an agent's row to reveal a nested table showing exactly which campaigns contributed to their total, broken down by Campaign Title and Commission Amount.
-
-### Analytics Leaderboard
-
-![Placeholder: Admin Analytics Page]
-
-- **Performance Insights**:
-    - **Leaderboard Toggle**: Switch view between **Top Sales Persons** (Ranked by Revenue) and **Top Campaigns**.
-    - **See More**: Expands the top 5 preview into a full ranked list of all agents/campaigns.
-- **Forecasting**:
-    - **Next Month Projection**: AI-driven estimate based on current month's growth rate (+15% logic).
-- **Product Intelligence**:
-    - **Top Selling Products**: Ranked list of best-selling items by revenue and quantity sold.
-- **Strategies**:
-    - **Revenue by Type**: Comparative analysis of different campaign types (e.g., Are 'Live' sessions generating more revenue than static 'Posts'?).
+| Feature | 🛡️ Admin | 💼 Sales Person |
+| --- | --- | --- |
+| **Dashboards** | Global Command Center (Team view) | Personal Dashboard (Self view) |
+| **Users** | Create, Edit, Deactivate Users | No Access |
+| **Campaigns** | Create, Edit, Delete, Start/Stop | View Assigned Campaigns Only |
+| **Orders** | Manage All Orders (Add/Edit/Delete) | View Own Orders Only |
+| **Payouts** | View All Commissions & Team Payouts | View Personal Commission & Dispute |
+| **Analytics** | Full Team Analytics | Personal Performance Stats |
 
 ---
 
-## Sales Person
+## **🚀 Getting Started**
 
-### Dashboard
+### **Login**
 
-![Placeholder: Sales Person Dashboard]
+All users access the system via the same login page.
 
-- **Personal Metrics**:
-    - **My Revenue**: Total sales generated by you this month.
-    - **My Earnings**: Total commission earned by you this month.
-    - **Commission Rate**: visual display of your current active percentage.
-- **My Campaigns**: Quick count of your currently active campaigns.
-- **Personal Feed**: List of your most recent orders only.
+1. Enter your **Username**.
+2. Enter your **Password**.
+3. Click **"Sign in"**.
 
-### Campaign
+> ℹ️ Note: If you enter invalid credentials, an error message will display.
 
-![Placeholder: My Campaigns List]
+---
 
-- **Assignment View**:
-    - Filters the global campaign list to show **only** campaigns assigned to you.
-    - **Status Indicators**: Clear badges for 'Active' vs 'Completed'.
-- **Performance Tracking**:
-    - View Total Revenue generated per campaign to track your own success.
-    - Access 'View Campaign' links to quickly check your social posts.
-- *Note: Sales Persons have read-only access and cannot Modify or Delete campaigns.*
+# **🛡️ Admin Guide**
 
-### Orders
+## **Dashboard**
 
-![Placeholder: My Orders List]
+Upon logging in, Admins land on the **Command Center**. This gives a high-level overview of the entire organization's performance.
 
-- **My Sales Ledger**:
-    - Filtered view showing only orders linked to your assigned campaigns.
-- **Order Details**:
-    - Click any order to view the full receipt: Date, Products, Quantity, and specific Commission earned.
-- **Transparency**:
-    - View the "Snapshot Rate" to verify you were paid the correct percentage for each specific order.
+### **Key Features**
 
-### Payouts
+- **Global Metrics**: View Total Revenue, Total Commissions Owed, and Active Campaigns count for the current month.
+- **🏆 Top Performer**: Automatically highlights the sales person with the highest revenue this month.
+- **💰 Quick Payout Overview**: A card displaying total liability (commissions owed) that links directly to the Payouts page.
+- **Sales Charts**:
+    - **Daily Sales**: Bar chart showing performance over the last 7 days.
+    - **Revenue by Platform**: Pie chart comparing Facebook vs. Instagram revenue.
+- **Recent Activity**: Live feed of the latest orders across the team.
 
-![Placeholder: My Payouts Page]
+---
 
-- **Personal Commission Tracker**:
-    - **Monthly Earnings**: Big, bold display of confirmed earnings for the selected month.
-    - **Target Progress**: Visual ring chart showing progress towards monthly sales targets (if set).
-- **Source Breakdown**:
-    - List of your campaigns and how much commission each one contributed to your paycheck.
-- **Dispute Resolution**:
-    - **Dispute Button**: Built-in tool to flag a discrepancy. Opens a form to submit a reason/message to the Admin for review.
+## **👥 Team Management (Users)**
 
-### Analytics
+Navigate to **Users** in the sidebar. This page is exclusive to Admins.
 
-![Placeholder: Sales Analytics View]
+### **Functions**
 
-- **Self-Assessment**:
-    - **Global Rank**: See where you stand in the team leaderboard.
-    - **Growth Chart**: Line chart showing your personal cumulative revenue (YTD) to track consistency.
-    - **Top Products**: Insights into which products are selling best in *your* campaigns, helping you decide what to promote next.
+- **View Team**: See a list of all users, their roles, active status, and commission rates.
+- **➕ Create User**:
+    1. Click the **"Create User"** button.
+    2. Enter Name, Username, and Password.
+    3. Select Role (**Admin** or **Sales**).
+    4. *For Sales role*: Set the **Commission Rate (%)** using the slider.
+    5. Click "Create User".
+- **✏️ Edit User**: Click the **Edit (Pencil)** icon on any user row to:
+    - Change password.
+    - Update commission rate.
+    - **Deactivate User**: Toggle the status to "Inactive" to prevent login access without deleting data.
+        - Last admin cannot be deleted
+    
+    
+
+---
+
+## **📢 Campaign Management**
+
+Navigate to **Campaigns**. This is the central hub for all marketing efforts.
+
+### **Creating a Campaign**
+
+1. Click **"➕ Create Campaign"**.
+2. **Basic Details**: Enter Title, Platform (FB/IG), Type (Post/Live/Event), and URL.
+3. **Assign Sales Person**: Select which team member owns this campaign.
+4. **Dates**: Set optional Start dates.
+5. Click **"Create"**.
+
+### **Managing Active Campaigns**
+
+Click on any campaign row to enter the **Campaign Detail View**.
+
+- **🛑 End Campaign**: If a campaign is active, click "End Campaign" to mark it as completed (automatically sets the end date to today).
+- **🔄 Reactivate**: If completed, you can re-open it by clicking "Reactivate".
+- **⚙️ Settings**: Update the Title, Platform, Type, or URL.
+- **Add Orders**: Manually add specific orders to this campaign directly from this view.
+- **Performance Monitoring**: View real-time Total Revenue and Commission Generated for this specific campaign.
+
+---
+
+## **📦 Order Management**
+
+Navigate to **Orders**. Admins have full control over the sales ledger.
+
+### **Functions**
+
+- **View All Orders**: See every sale recorded in the system, sortable by Date or Amount.
+- **➕ Add Order**: Manually record a sale for any campaign.
+    - Select Campaign -> Add Products -> Save.
+- **✏️ Edit/Delete Orders**: Correct mistakes or remove invalid entries.
+- **Commission Tracking**: Hover over the commission column to see the **Snapshot Rate** (the commission rate locked in at the time of the order).
+
+---
+
+## **💸 Team Payouts**
+
+Navigate to **Payouts**. This provides a payroll-ready view of commissions.
+
+### **Functions**
+
+- **Monthly Overview**: Select a Month/Year to view totals for that period.
+- **Payout Summary**: Displays Total Sales vs. Total Commission Owed.
+- **Agent Breakdown**:
+    - List of all active sales persons.
+    - Shows **YTD (Year-to-Date)** earnings and current month earnings.
+    - **Expandable Rows**: Click a user's row to see exactly which campaigns generated their commission.
+
+---
+
+## **📈 Analytics & Leaderboard**
+
+Navigate to **Analytics**.
+
+### **Functions**
+
+- **🏆 Leaderboard**:
+    - Toggle between **Sales Persons** (Top earners) and **Campaigns** (Best performing campaigns).
+    - Click "See More" to view the full ranking list.
+- **Revenue Insights**:
+    - **Top Products**: See which items are selling the most.
+    - **Revenue by Type**: Compare Post vs. Live vs. Event performance.
+    - **Forecast**: AI-driven projection for next month's revenue.
+---
+
+# **💼 Sales Person Guide**
+
+## **🏠 Personal Dashboard**
+
+Sales persons see a personalized view focused on *their* performance.
+
+### **Key Features**
+
+- **My Metrics**: View **Your Revenue**, **Your Earnings** (Commission), and **Your Active Campaigns**.
+- **Commission Rate**: Your current active commission percentage is displayed at the top.
+- **Recent Orders**: A feed of your latest personal sales.
+
+---
+
+## **📢 My Campaigns**
+
+Navigate to **Campaigns**.
+
+### **Functions**
+
+- **View Assignments**: See only the campaigns assigned to you by the Admin.
+- **Track Status**: Monitor which campaigns are **Active** vs. **Completed**.
+- **Revenue Tracking**: See exactly how much revenue each of your campaigns has generated.
+
+> ℹ️ Note: Sales persons can view campaign details (products sold per campaign) but cannot create, edit, or delete campaigns.
+> 
+
+---
+
+## **📦 My Orders**
+
+Navigate to **Orders**.
+
+### **Functions**
+
+- **Order History**: View a log of all orders linked to your campaigns.
+- **Order Details**: Click any order to see specific products sold and the commission earned on that transaction.
+- **Verify Rates**: Check the "Snapshot Rate" to ensure you were paid the correct % for older orders.
+
+---
+
+## **💸 My Payouts**
+
+Navigate to **Payouts**.
+
+### **Functions**
+
+- **Earnings Tracker**: A clear view of how much you have earned this month.
+- **Progress Ring**: Visual indicator of your sales vs. monthly target.
+- **Campaign Breakdown**: See which of your campaigns is performing best.
+- **Dispute Tool**:
+    - Found an issue? Click **"Dispute"**.
+    - Enter a reason and submit it to the Admin for review.
+
+---
+
+## **📈 Performance Analytics**
+
+Navigate to **Analytics**.
+
+### **Functions**
+
+- **Global Leaderboard**: See how you rank against the rest of the team.
+- **Personal Trends**: View your cumulative revenue growth over the year.
+- **Product Insights**: Understand which products sell best in your campaigns so you can push them more during Lives/Events.
