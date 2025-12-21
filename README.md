@@ -74,8 +74,10 @@ A web-based platform that automates sales tracking, locks commission rates at th
 ### Prerequisites
 
 - **Node.js** 18+ and npm
-- **MongoDB** 6+ (local installation or Docker)
+- **Docker** and Docker Compose (recommended for MongoDB)
 - **Git** for version control
+
+> **Note**: While you can install MongoDB locally, using Docker is recommended for easier setup and consistency across environments.
 
 ### Installation
 
@@ -85,18 +87,53 @@ A web-based platform that automates sales tracking, locks commission rates at th
    cd sales-hub
    ```
 
-2. **Install frontend dependencies**
+2. **Start MongoDB with Docker** (recommended)
+   ```bash
+   # Create and start MongoDB container
+   docker run -d \
+     --name pebble-mongodb \
+     -p 27017:27017 \
+     -e MONGO_INITDB_DATABASE=pebble-sales-hub \
+     mongo:6
+   ```
+   
+   Or use Docker Compose (create `docker-compose.yml` in root):
+   ```yaml
+   services:
+     mongodb:
+       image: mongo:7.0
+       container_name: pebble-mongodb
+       ports:
+         - "27017:27017"
+       environment:
+         MONGO_INITDB_DATABASE: pebble-sales-hub
+       volumes:
+         - mongodb_data:/data/db
+       restart: unless-stopped
+       command: ["--replSet", "rs0", "--bind_ip_all"]
+   
+   volumes:
+     mongodb_data:
+       driver: local
+   ```
+   
+   Then run:
+   ```bash
+   docker-compose up -d
+   ```
+
+3. **Install frontend dependencies**
    ```bash
    npm install
    ```
 
-3. **Install backend dependencies**
+4. **Install backend dependencies**
    ```bash
    cd backend
    npm install
    ```
 
-4. **Set up environment variables**
+5. **Set up environment variables**
 
    Create `.env` files in both root and `backend/` directories:
 
@@ -112,13 +149,21 @@ A web-based platform that automates sales tracking, locks commission rates at th
    PORT=3000
    ```
 
-5. **Initialize the database**
+6. **Initialize the database**
    ```bash
    cd backend
+   
+   # Generate Prisma Client (required after npm install)
    npx prisma generate
+   
+   # Push schema to MongoDB
    npx prisma db push
+   
+   # Seed with test data
    npm run seed
    ```
+   
+   > **Important**: `npx prisma generate` must be run after `npm install` on any new machine. This generates the Prisma Client based on your schema.
 
 ### Running the Application
 

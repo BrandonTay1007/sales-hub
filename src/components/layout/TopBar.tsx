@@ -2,6 +2,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 import { Badge } from '@/components/ui/badge';
 
+/**
+ * TopBar Component
+ * Desktop-only top navigation bar (hidden on mobile)
+ * Displays theme toggle, user info, avatar, and admin badge
+ */
 export const TopBar = () => {
   const { user, isAdmin } = useAuth();
 

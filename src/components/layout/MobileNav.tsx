@@ -5,6 +5,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ThemeToggle } from '@/components/shared/ThemeToggle';
 
+/**
+ * Get navigation items based on user role
+ * Admin users see full navigation, sales users see limited navigation
+ * @param isAdmin - Whether the current user is an admin
+ * @returns Array of navigation items with title, url, and icon
+ */
 const getNavItems = (isAdmin: boolean) => {
   if (isAdmin) {
     return [
@@ -24,6 +30,12 @@ const getNavItems = (isAdmin: boolean) => {
   ];
 };
 
+/**
+ * MobileNav Component
+ * Mobile-only navigation drawer (hidden on desktop)
+ * Uses Sheet component for slide-in navigation menu
+ * Displays user profile, role-based nav items, and logout button
+ */
 export const MobileNav = () => {
   const [open, setOpen] = useState(false);
   const location = useLocation();

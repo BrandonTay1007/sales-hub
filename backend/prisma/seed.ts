@@ -3,6 +3,16 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+/**
+ * Main seed function
+ * Seeds the database with test data including:
+ * - 1 admin user
+ * - 5 sales persons with varying commission rates
+ * - Multiple campaigns across Facebook and Instagram
+ * - Orders for current year and previous year (for YTD calculations)
+ * - Auto-generated referenceIds for campaigns and orders
+ * - Persisted counters for atomic sequence generation
+ */
 async function main() {
     console.log('🌱 Starting seed...');
 
@@ -18,7 +28,11 @@ async function main() {
     const campaignCounters: Record<string, number> = { facebook: 0, instagram: 0 };
     const orderCounters: Record<string, number> = {};
 
-    // Hash passwords
+    /**
+     * Hash a password using bcrypt
+     * @param password - Plain text password
+     * @returns Hashed password
+     */
     const hashPassword = async (password: string) => {
         return bcrypt.hash(password, 10);
     };

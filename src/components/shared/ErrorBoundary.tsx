@@ -1,26 +1,49 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { toast } from 'sonner';
 
+/**
+ * Props for ErrorBoundary component
+ */
 interface Props {
     children: ReactNode;
     fallback?: ReactNode;
 }
 
+/**
+ * State for ErrorBoundary component
+ */
 interface State {
     hasError: boolean;
     error: Error | null;
 }
 
+/**
+ * ErrorBoundary Component
+ * React error boundary to catch and handle runtime errors
+ * Displays user-friendly error UI with retry and navigation options
+ * Shows toast notifications for errors
+ */
 class ErrorBoundary extends Component<Props, State> {
     constructor(props: Props) {
         super(props);
         this.state = { hasError: false, error: null };
     }
 
+    /**
+     * React lifecycle method to update state when error occurs
+     * @param error - The error that was thrown
+     * @returns New state with error information
+     */
     static getDerivedStateFromError(error: Error): State {
         return { hasError: true, error };
     }
 
+    /**
+     * React lifecycle method called after an error is caught
+     * Logs error to console and shows toast notification
+     * @param error - The error that was thrown
+     * @param errorInfo - Additional error information from React
+     */
     componentDidCatch(error: Error, errorInfo: ErrorInfo) {
         // Log to console in development
         console.error('Error caught by boundary:', error, errorInfo);
@@ -31,6 +54,9 @@ class ErrorBoundary extends Component<Props, State> {
         });
     }
 
+    /**
+     * Reset error state to retry rendering
+     */
     handleRetry = () => {
         this.setState({ hasError: false, error: null });
     };

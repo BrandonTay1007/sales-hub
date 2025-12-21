@@ -3,6 +3,12 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
+/**
+ * ThemeToggle Component
+ * Button to toggle between light and dark themes
+ * Persists theme preference to localStorage
+ * Shows sun icon in dark mode, moon icon in light mode
+ */
 export const ThemeToggle = () => {
   const [isDark, setIsDark] = useState(false);
 
@@ -11,6 +17,10 @@ export const ThemeToggle = () => {
     setIsDark(isDarkMode);
   }, []);
 
+  /**
+   * Toggle between light and dark themes
+   * Updates DOM class and localStorage
+   */
   const toggleTheme = () => {
     const newIsDark = !isDark;
     setIsDark(newIsDark);

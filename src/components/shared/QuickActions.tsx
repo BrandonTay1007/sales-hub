@@ -5,6 +5,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * QuickActions Component
+ * Floating action button (FAB) for admin quick actions
+ * Displays expandable menu with shortcuts to create campaigns and orders
+ * Uses framer-motion for smooth animations
+ * Admin-only component
+ */
 export const QuickActions = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();

@@ -1,6 +1,9 @@
 import { ChevronRight, Home } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
+/**
+ * Mapping of route segments to human-readable labels
+ */
 const routeLabels: Record<string, string> = {
   dashboard: 'Dashboard',
   users: 'Users',
@@ -10,6 +13,12 @@ const routeLabels: Record<string, string> = {
   analytics: 'Analytics',
 };
 
+/**
+ * Breadcrumbs Component
+ * Displays navigation breadcrumb trail based on current route
+ * Automatically detects MongoDB ObjectIds and labels them as 'Campaign'
+ * Shows home icon for root and clickable links for intermediate paths
+ */
 export const Breadcrumbs = () => {
   const location = useLocation();
   const pathSegments = location.pathname.split('/').filter(Boolean);

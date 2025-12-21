@@ -3,6 +3,13 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { notifications } from '@/lib/mockData';
 
+/**
+ * NotificationsPopover Component
+ * Displays notification bell icon with unread count badge
+ * Shows popover with list of notifications when clicked
+ * Highlights unread notifications with blue dot and background
+ * Uses mock data from @/lib/mockData
+ */
 export const NotificationsPopover = () => {
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -31,9 +38,8 @@ export const NotificationsPopover = () => {
             notifications.map((notification) => (
               <div
                 key={notification.id}
-                className={`p-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors ${
-                  !notification.read ? 'bg-primary/5' : ''
-                }`}
+                className={`p-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors ${!notification.read ? 'bg-primary/5' : ''
+                  }`}
               >
                 <div className="flex items-start gap-2">
                   {!notification.read && (

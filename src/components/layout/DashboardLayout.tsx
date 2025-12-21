@@ -7,10 +7,20 @@ import { Breadcrumbs } from './Breadcrumbs';
 import { QuickActions } from '../shared/QuickActions';
 import { useAuth } from '@/contexts/AuthContext';
 
+/**
+ * Props for DashboardLayout component
+ */
 interface DashboardLayoutProps {
+  /** Child components to render within the layout */
   children: ReactNode;
 }
 
+/**
+ * DashboardLayout Component
+ * Main layout wrapper for authenticated pages
+ * Handles responsive layout with sidebar, top bar, breadcrumbs, and quick actions
+ * Redirects to login if user is not authenticated
+ */
 export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   const { user, isAdmin } = useAuth();
 

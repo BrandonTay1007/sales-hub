@@ -4,11 +4,13 @@ services:
     container_name: pebble-mongodb
     ports:
       - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: pebble-sales-hub
     volumes:
       - mongodb_data:/data/db
-    environment:
-      - MONGO_INITDB_DATABASE=pebble-sales-hub
+    restart: unless-stopped
     command: [ "--replSet", "rs0", "--bind_ip_all" ]
 
 volumes:
   mongodb_data:
+    driver: local
