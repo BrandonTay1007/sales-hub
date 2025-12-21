@@ -43,21 +43,21 @@ Total Tasks: 19 sub-tasks across 4 task groups
 **Dependencies:** None
 
 - [x] 2.0 Complete OrdersPage fixes
-  - [x] 2.1 Default Sort After Create
-    - Reset sortBy state after order creation
-    - Sort by createdAt descending (latest first)
-    - New order appears at top of table
-
-  - [x] 2.3 Minimum 1 Product Validation
-    - Check products array before save
-    - Show toast.error if 0 valid products
-    - Apply to both create and edit flows
+  - [x] Phase 1: Documentation Centralization
+    - [x] Create `docs/` folder
+    - [x] Move existing docs and raw requirements
+    - [x] Create directory-style root `README.md`
+- [x] Phase 2: Frontend Atomic Reorganization
+    - [x] Create `components/layout/` and `components/shared/`
+    - [x] Move atomic components and update imports
+- [x] Phase 3: Feature-Driven Migration (Frontend)
+    - [x] Create `src/features/` subdirectories
+    - [x] Move domain logic and update imports
   - [x] 2.4 Scrollable Product List in Modal
     - Add `max-h-48 overflow-y-auto` to product container
     - Keep Add Product button outside scroll
   - [x] 2.5 Remove Pen Icon from Modal Header
     - Remove Edit2 button from DialogTitle
-    - Use inline table icons only
 
 **Acceptance Criteria:**
 - New orders appear at top of table ✅

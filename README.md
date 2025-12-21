@@ -1,144 +1,213 @@
 # Pebble Sales Hub
 
-Pebble Sales Hub is a professional sales commission tracking system designed for businesses selling products through social media campaigns (Facebook, Instagram). It replaces manual spreadsheets with a high-performance web application, providing real-time tracking of sales person performance and accurate commission payouts.
+> A modern sales commission tracking system for social media campaigns
 
-## 🚀 Key Features
+## Table of Contents
 
-- **Campaign Management**: Track performance across Facebook and Instagram (Live, Posts, Events).
-- **Order Tracking**: captured directly under campaigns with automated commission snapshots.
-- **Commission Snapshot Logic**: Accurately calculates payouts by locking the commission rate at the time of sale, protecting against future rate changes.
-- **Payout Reports**: Detailed monthly and yearly commission breakdown for sales persons.
-- **Sales Leaderboard**: Real-time performance ranking by Sales Person or Campaign.
-- **Human-Readable IDs**: Automatic generation of professional reference IDs (e.g., `FB-001`, `FB-001-01`).
-- **Data Integrity**: 5-second undo window for deletions and comprehensive admin protections.
+- [About](#about)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Running the Application](#running-the-application)
+- [Usage](#usage)
+- [Project Structure](#project-structure)
+- [Documentation](#documentation)
+- [License](#license)
 
-## 🛠️ Tech Stack
+## About
+
+Pebble Sales Hub is a custom-built sales tracking and commission management system designed for businesses selling products through social media platforms (Facebook and Instagram).
+
+**The Problem:**  
+Manual tracking of sales and commissions using Excel and paper creates accuracy issues, especially as the business scales. Sales persons need clear visibility into their earnings, and administrators need reliable tools to manage campaigns and calculate payouts.
+
+**The Solution:**  
+A web-based platform that automates sales tracking, locks commission rates at the time of sale (commission snapshot), and provides real-time insights into performance through an intuitive dashboard.
+
+## Features
+
+### For Administrators
+- **User Management** - Create and manage admin and sales person accounts with custom commission rates
+- **Campaign Tracking** - Monitor Facebook and Instagram campaigns (posts, events, live streams)
+- **Order Management** - Record multi-product sales orders with automatic total and commission calculations
+- **Team Payouts** - View consolidated commission reports across all sales staff
+- **Analytics Dashboard** - Performance insights, leaderboards, and revenue trends
+
+### For Sales Personnel
+- **Campaign Overview** - View assigned campaigns and performance metrics
+- **Order History** - Track all sales orders under their campaigns
+- **Commission Reports** - Monthly payout breakdowns by campaign
+- **Personal Analytics** - Individual performance stats and rankings
+
+### Core Capabilities
+- **Commission Snapshot Logic** - Locks commission rates at order creation time, ensuring fair payouts even if rates change later
+- **Human-Readable IDs** - Auto-generated reference IDs for campaigns (e.g., `FB-001`) and orders (e.g., `FB-001-12`)
+- **Role-Based Access Control** - Separate views and permissions for admins and sales staff
+- **Real-Time Calculations** - Automatic order totals and commission amounts
+- **Flexible Product Management** - Add, edit, or remove products from orders with automatic recalculation
+
+## Tech Stack
 
 ### Frontend
-- **React 18** with **TypeScript** & **Vite**
-- **Tailwind CSS** & **shadcn/ui** for premium styling
-- **TanStack Query** for efficient data fetching
-- **Recharts** for interactive data visualization
+- **React 18** - Modern UI library with hooks
+- **TypeScript** - Type-safe development
+- **Vite** - Fast build tool and dev server
+- **TanStack Query** - Server state management
+- **Tailwind CSS** - Utility-first styling
+- **shadcn/ui** - Accessible component library
+- **Recharts** - Data visualization
+- **Framer Motion** - Smooth animations
 
 ### Backend
-- **Node.js** & **Express** with **TypeScript**
-- **MongoDB** with **Prisma ORM**
-- **JWT Authentication** (jsonwebtoken + bcryptjs)
+- **Node.js** - JavaScript runtime
+- **Express** - Web application framework
+- **TypeScript** - Type-safe server code
+- **MongoDB** - NoSQL database
+- **Prisma ORM** - Type-safe database client
+- **JWT** - Secure authentication
+- **bcryptjs** - Password hashing
 
----
-
-## 💻 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- **Node.js 18+**
-- **Docker Desktop** (for running MongoDB locally)
+- **Node.js** 18+ and npm
+- **MongoDB** 6+ (local installation or Docker)
+- **Git** for version control
 
-### Step 1: Clone and Install
+### Installation
 
-```bash
-# Clone the repository
-git clone <your-repo-url>
-cd sales-hub
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd sales-hub
+   ```
 
-# Install Frontend dependencies
-npm install
+2. **Install frontend dependencies**
+   ```bash
+   npm install
+   ```
 
-# Install Backend dependencies
-cd backend
-npm install
+3. **Install backend dependencies**
+   ```bash
+   cd backend
+   npm install
+   ```
+
+4. **Set up environment variables**
+
+   Create `.env` files in both root and `backend/` directories:
+
+   **Root `.env`:**
+   ```env
+   VITE_API_URL=http://localhost:3000/api
+   ```
+
+   **Backend `.env`:**
+   ```env
+   DATABASE_URL="mongodb://localhost:27017/pebble-sales-hub"
+   JWT_SECRET="your-secret-key-here"
+   PORT=3000
+   ```
+
+5. **Initialize the database**
+   ```bash
+   cd backend
+   npx prisma generate
+   npx prisma db push
+   npm run seed
+   ```
+
+### Running the Application
+
+1. **Start the backend server** (from `backend/` directory)
+   ```bash
+   npm run dev
+   ```
+   Backend runs on `http://localhost:3000`
+
+2. **Start the frontend** (from root directory)
+   ```bash
+   npm run dev
+   ```
+   Frontend runs on `http://localhost:8080`
+
+3. **Access the application**
+   - Open `http://localhost:8080` in your browser
+   - Use test credentials below to log in
+
+## Usage
+
+### Test Credentials
+
+**Administrator Account:**
+- Username: `admin`
+- Password: `admin123`
+
+**Sales Person Accounts:**
+- Username: `sarah.j` | Password: `password123`
+- Username: `mike.c` | Password: `password123`
+- Username: `emma.w` | Password: `password123`
+
+### Key Workflows
+
+1. **Admin: Create a Campaign**
+   - Navigate to Campaigns → Create Campaign
+   - Assign to a sales person
+   - Campaign gets a unique ID (e.g., `FB-001`)
+
+2. **Admin: Register an Order**
+   - Navigate to Orders → Add Order
+   - Select campaign and add products
+   - Commission is automatically calculated and locked
+
+3. **Sales Person: View Payouts**
+   - Navigate to My Payouts
+   - Select month/year to view earnings breakdown by campaign
+
+4. **View Analytics**
+   - Dashboard shows performance metrics
+   - Leaderboard ranks top performers
+
+## Project Structure
+
+```
+sales-hub/
+├── src/                    # Frontend source code
+│   ├── features/          # Feature-based modules (auth, campaigns, orders, etc.)
+│   ├── components/        # Shared UI components
+│   ├── lib/              # API client and utilities
+│   └── contexts/         # React contexts (Auth, Theme)
+├── backend/               # Backend API
+│   ├── src/
+│   │   ├── routes/       # API endpoints
+│   │   ├── services/     # Business logic
+│   │   ├── middleware/   # Auth, error handling
+│   │   └── utils/        # Helper functions
+│   │   └── apps.ts       # Main application file  
+│   └── prisma/           # Database schema and migrations
+├── docs/                  # Documentation
+│   ├── API.md            # API endpoint reference
+│   ├── FEATURES.md       # Core business logic
+│   ├── README.md         # Setup and deployment guide
+│   └── requirements/     # Project requirements
+└── agent-os/             # Development specifications and AI prompts
 ```
 
-### Step 2: Environment Setup
+## Documentation
 
-1. **Frontend**: The frontend uses `http://localhost:3000/api` by default. Copy `.env.example` to `.env` in the root directory if you need to change this.
-2. **Backend**: Copy `backend/.env.example` to `backend/.env` and update the `JWT_SECRET`.
+- **[Setup Guide](./docs/README.md)** - Detailed installation and deployment instructions
+- **[API Reference](./docs/API.md)** - Complete API endpoint documentation
+- **[Feature Logic](./docs/FEATURES.md)** - In-depth explanation of commission snapshots, RBAC, and core features
+- **[User Guide](./docs/USER_GUIDE.md)** - Step-by-step guide for end users
+- **[Requirements](./docs/requirements/)** - Original project requirements and specifications
 
-### Step 3: Run the Database
+## License
 
-The project uses MongoDB. Start the local instance using Docker:
-
-```bash
-cd backend
-docker-compose up -d
-```
-
-### Step 4: Initialize the Database
-
-```bash
-cd backend
-# Generate Prisma client
-npx prisma generate
-# Push the schema to MongoDB
-npm run prisma:push
-# Seed with initial test data (Admin/Sales accounts)
-npm run seed
-```
-
-### Step 5: Start the Application
-
-Open two terminal windows:
-
-**Terminal 1 (Backend)**:
-```bash
-cd backend
-npm run dev
-```
-*Backend runs at `http://localhost:3000`*
-
-**Terminal 2 (Frontend)**:
-```bash
-# From the root directory
-npm run dev
-```
-*Frontend runs at `http://localhost:8080`*
+MIT License - see LICENSE file for details
 
 ---
 
-## 🍎 Cross-Platform Support (macOS/Linux)
-
-While the project is designed to be cross-platform, users on macOS or Linux might encounter these common issues:
-
-### 1. MongoDB Replica Set Initialization
-Prisma requires a replica set for transactions. If you see connection errors:
-```bash
-docker exec -it pebble-mongodb mongosh --eval "rs.initiate()"
-```
-
-### 2. Apple Silicon (M1/M2/M3)
-If the MongoDB container crashes or performs poorly, ensure you are using a modern Docker Desktop version. You can also explicitly set the platform in `docker-compose.yml`:
-```yaml
-services:
-  mongodb:
-    platform: linux/amd64
-```
-
-### 3. Case-Sensitivity (Linux)
-Linux file systems are case-sensitive. Ensure all `import` statements exactly match the filename casing (e.g., `App.tsx` vs `app.tsx`).
-
-### 4. Native Modules
-If moving the project between different operating systems, **always** delete `node_modules` and run `npm install` to rebuild native binaries like `bcrypt`.
-
----
-
-## 🔑 Test Credentials
-
-After running the seed script, you can log in with:
-
-| Role | Username | Password |
-|------|----------|----------|
-| **Admin** | `admin` | `admin123` |
-| **Sales** | `sarah.j` | `password123` |
-
----
-
-## 📂 Project Structure
-
-- `/src`: Frontend application (Pages, Components, Contexts)
-- `/backend`: Node.js API, Prisma schema, and seed data
-- `/agent-os`: Project roadmap and technical specifications
-- `/requirements`: Business rules and original project scope
-
-## 📄 License
-
-This project is proprietary and intended for internal use by Pebble Tech.
+**Built with ❤️ for efficient sales tracking and fair commission management**

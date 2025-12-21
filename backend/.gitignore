@@ -8,6 +8,7 @@ dist/
 .env
 .env.local
 .env.*.local
+!.env.example
 
 # IDE
 .idea/
@@ -29,3 +30,15 @@ coverage/
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+
+# Agent Metadata
+.claude/
+.gemini/
+
+# Temporary files
+test_output.txt
+build_error.txt
+
+# OS-specific files
+Thumbs.db
+.DS_Store
