@@ -120,6 +120,7 @@ const UsersPage = () => {
       name: editingUser.name,
       username: editingUser.username,
       commissionRate: editingUser.role === 'sales' ? editingUser.commissionRate : undefined,
+      commissionPausedDate: editingUser.role === 'sales' ? editingUser.commissionPausedDate : undefined,
       status: editingUser.status,
     };
 
@@ -499,6 +500,41 @@ const UsersPage = () => {
                     })}
                   />
                 </div>
+
+                {/* Commission Pause Toggle - Only for sales role */}
+                {editingUser.role === 'sales' && (
+                  <div className="py-3 border-b border-border space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-foreground">Commission Pause</p>
+                        <p className="text-sm text-muted-foreground">Pause commission for this user</p>
+                      </div>
+                      <Switch
+                        checked={!!editingUser.commissionPausedDate}
+                        onCheckedChange={(checked) => setEditingUser({
+                          ...editingUser,
+                          commissionPausedDate: checked ? new Date().toISOString().split('T')[0] : null
+                        })}
+                      />
+                    </div>
+                    {/* Date picker when paused */}
+                    {editingUser.commissionPausedDate && (
+                      <div>
+                        <label className="form-label">Pause Start Date</label>
+                        <input
+                          type="date"
+                          value={editingUser.commissionPausedDate?.split('T')[0] || ''}
+                          onChange={(e) => setEditingUser({
+                            ...editingUser,
+                            commissionPausedDate: e.target.value
+                          })}
+                          min={new Date().toISOString().split('T')[0]}
+                          className="form-input"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <button

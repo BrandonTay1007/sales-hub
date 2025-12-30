@@ -89,7 +89,7 @@ export const userController = {
     async update(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { name, password, role, commissionRate, status } = req.body;
+            const { name, password, role, commissionRate, commissionPausedDate, status } = req.body;
 
             // Validate optional fields if provided
             if (name !== undefined && (typeof name !== 'string' || name.length < 2)) {
@@ -110,6 +110,7 @@ export const userController = {
                 password,
                 role,
                 commissionRate,
+                commissionPausedDate,
                 status,
             });
 

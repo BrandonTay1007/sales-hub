@@ -8,6 +8,7 @@ export interface User {
   username: string;
   role: 'admin' | 'sales';
   commissionRate?: number;
+  commissionPausedDate?: string | null; // null = active, ISO date = paused since that date
   status: 'active' | 'inactive';
   avatar?: string;
 }

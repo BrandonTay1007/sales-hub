@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ordersApi, campaignsApi, getErrorMessage, type Order, type Campaign } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { Calendar, Download, MessageSquare, TrendingUp, ChevronDown, ChevronRight, Wallet, ArrowUpRight, ArrowDownRight, MoreHorizontal, Filter, Search, Loader2 } from 'lucide-react';
+import { Calendar, Download, MessageSquare, TrendingUp, ChevronDown, ChevronRight, Wallet, ArrowUpRight, ArrowDownRight, MoreHorizontal, Filter, Search, Loader2, PauseCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -85,14 +85,14 @@ const PayoutsPage = () => {
 
   // Calculate totals
   const totalSales = userMonthOrders.reduce((sum, o) => sum + o.orderTotal, 0);
-  const totalCommission = userMonthOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
+  const totalCommission = userMonthOrders.reduce((sum, o) => sum + (o.commissionPaused ? 0 : o.commissionAmount), 0);
 
   // Group orders by campaign
   const campaignBreakdown = useMemo(() => {
     return userCampaigns.map(campaign => {
       const campaignOrders = userMonthOrders.filter(o => o.campaignId === campaign.id);
       const campaignSales = campaignOrders.reduce((sum, o) => sum + o.orderTotal, 0);
-      const campaignCommission = campaignOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
+      const campaignCommission = campaignOrders.reduce((sum, o) => sum + (o.commissionPaused ? 0 : o.commissionAmount), 0);
       const avgRate = campaignOrders.length > 0
         ? campaignOrders.reduce((sum, o) => sum + o.snapshotRate, 0) / campaignOrders.length
         : user?.commissionRate || 0;
@@ -127,7 +127,7 @@ const PayoutsPage = () => {
         return matchesDate && belongsToUser;
       });
 
-      const commission = monthOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
+      const commission = monthOrders.reduce((sum, o) => sum + (o.commissionPaused ? 0 : o.commissionAmount), 0);
       result.push({
         month: months.find(m => m.value === month)?.short || '',
         commission: Math.round(commission * 100) / 100,
@@ -404,8 +404,15 @@ const PayoutsPage = () => {
                                 </td>
                                 <td className="py-2 text-right">RM {order.orderTotal.toFixed(2)}</td>
                                 <td className="py-2 text-right text-primary">{order.snapshotRate}%</td>
-                                <td className="py-2 text-right font-medium text-success">
-                                  RM {order.commissionAmount.toFixed(2)}
+                                <td className="py-2 text-right font-medium">
+                                  {order.commissionPaused ? (
+                                    <span className="flex items-center gap-1 justify-end text-muted-foreground">
+                                      <PauseCircle className="w-3 h-3 text-amber-500" />
+                                      RM 0.00
+                                    </span>
+                                  ) : (
+                                    <span className="text-success">RM {order.commissionAmount.toFixed(2)}</span>
+                                  )}
                                 </td>
                               </tr>
                             ))}

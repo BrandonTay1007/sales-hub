@@ -133,6 +133,7 @@ export const orderService = {
                     select: {
                         id: true,
                         commissionRate: true,
+                        commissionPausedDate: true,
                     },
                 },
             },
@@ -154,6 +155,17 @@ export const orderService = {
         const snapshotRate = campaign.salesPerson.commissionRate;
         const commissionAmount = calculateCommission(orderTotal, snapshotRate);
 
+        // Check if commission is paused for this sales person
+        // If pause date is set and is today or in the past, commission is paused
+        let commissionPaused = false;
+        if (campaign.salesPerson.commissionPausedDate) {
+            const pauseDate = new Date(campaign.salesPerson.commissionPausedDate);
+            pauseDate.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            commissionPaused = pauseDate <= today;
+        }
+
         // Generate referenceId using campaign's referenceId
         const referenceId = await counterService.generateOrderReferenceId(campaign.referenceId);
 
@@ -166,6 +178,7 @@ export const orderService = {
                 orderTotal,
                 snapshotRate,
                 commissionAmount,
+                commissionPaused,
                 status: 'active',
             },
             include: {
@@ -181,6 +194,7 @@ export const orderService = {
 
         return order;
     },
+
 
     /**
      * Update an order's products

@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ordersApi, campaignsApi, usersApi, type Order, type Campaign, type User, getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { DollarSign, TrendingUp, Megaphone, Trophy, ArrowUpRight, ArrowDownRight, ShoppingCart, Wallet, Loader2 } from 'lucide-react';
+import { DollarSign, TrendingUp, Megaphone, Trophy, ArrowUpRight, ArrowDownRight, ShoppingCart, Wallet, Loader2, PauseCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 const Dashboard = () => {
   const { isAdmin, user } = useAuth();
@@ -67,7 +68,7 @@ const Dashboard = () => {
     const lastMonthSales = lastMonthOrders.reduce((sum, o) => sum + o.orderTotal, 0);
     const salesTrend = lastMonthSales > 0 ? ((totalSales - lastMonthSales) / lastMonthSales) * 100 : (totalSales > 0 ? 100 : 0);
 
-    const totalCommissions = currentMonthOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
+    const totalCommissions = currentMonthOrders.reduce((sum, o) => sum + (o.commissionPaused ? 0 : o.commissionAmount), 0);
     const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
 
     // For sales users, calculate their personal stats
@@ -86,7 +87,7 @@ const Dashboard = () => {
     const userTotalSales = userCurrentMonthOrders.reduce((sum, o) => sum + o.orderTotal, 0);
     const userLastMonthSales = userLastMonthOrders.reduce((sum, o) => sum + o.orderTotal, 0);
     const userSalesTrend = userLastMonthSales > 0 ? ((userTotalSales - userLastMonthSales) / userLastMonthSales) * 100 : (userTotalSales > 0 ? 100 : 0);
-    const userTotalCommission = userCurrentMonthOrders.reduce((sum, o) => sum + o.commissionAmount, 0);
+    const userTotalCommission = userCurrentMonthOrders.reduce((sum, o) => sum + (o.commissionPaused ? 0 : o.commissionAmount), 0);
     const userOrderCount = userCurrentMonthOrders.length;
     const userActiveCampaigns = userCampaigns.filter(c => c.status === 'active').length;
 
@@ -215,6 +216,17 @@ const Dashboard = () => {
             )}
           </p>
         </div>
+
+        {/* Commission Pause Banner - For sales users when paused */}
+        {!isAdmin && user?.commissionPausedDate && (
+          <Alert className="border-amber-500/50 bg-amber-500/10">
+            <PauseCircle className="h-4 w-4 text-amber-500" />
+            <AlertTitle className="text-amber-600 dark:text-amber-400">Commission Paused</AlertTitle>
+            <AlertDescription className="text-amber-600/80 dark:text-amber-400/80">
+              Your commission is paused since {new Date(user.commissionPausedDate).toLocaleDateString('en-US', { dateStyle: 'medium' })}. Orders during this period will show RM0.00 commission.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Metric Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -12,15 +12,16 @@ datasource db {
 
 // User model - Admin or Sales Person
 model User {
-  id             String     @id @default(auto()) @map("_id") @db.ObjectId
-  name           String
-  username       String     @unique
-  passwordHash   String
-  role           Role       @default(sales)
-  commissionRate Float      @default(10) // 0-100, only used for sales role
-  status         UserStatus @default(active)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id                   String     @id @default(auto()) @map("_id") @db.ObjectId
+  name                 String
+  username             String     @unique
+  passwordHash         String
+  role                 Role       @default(sales)
+  commissionRate       Float      @default(10) // 0-100, only used for sales role
+  commissionPausedDate DateTime?  // null = active, date = paused since that date
+  status               UserStatus @default(active)
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
 
   // Relations
   campaigns Campaign[]
@@ -94,6 +95,7 @@ model Order {
   orderTotal       Float // Calculated: sum of products
   snapshotRate     Float // Commission rate captured at order creation (IMMUTABLE)
   commissionAmount Float // Calculated: orderTotal * (snapshotRate / 100)
+  commissionPaused Boolean     @default(false) // Set at creation based on sales person pause status
   status           OrderStatus @default(active)
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

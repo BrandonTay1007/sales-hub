@@ -111,11 +111,11 @@ const AdminTeamPayouts = () => {
 
       const totalSales = userOrders.reduce((sum, o) => sum + o.orderTotal, 0);
       const totalCommission = userOrders.reduce(
-        (sum, o) => sum + o.commissionAmount,
+        (sum, o) => sum + (o.commissionPaused ? 0 : o.commissionAmount),
         0,
       );
       const ytdCommission = userYtdOrders.reduce(
-        (sum, o) => sum + o.commissionAmount,
+        (sum, o) => sum + (o.commissionPaused ? 0 : o.commissionAmount),
         0,
       );
 
@@ -130,7 +130,7 @@ const AdminTeamPayouts = () => {
             0,
           );
           const campaignCommission = campaignOrders.reduce(
-            (sum, o) => sum + o.commissionAmount,
+            (sum, o) => sum + (o.commissionPaused ? 0 : o.commissionAmount),
             0,
           );
           return {

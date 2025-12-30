@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ordersApi, campaignsApi, usersApi, type Order, type Campaign, type User, type Product, getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Search, Filter, Loader2, Trash2, Edit2, ClipboardList, ShoppingCart, X, Facebook, Instagram, Pencil } from 'lucide-react';
+import { Plus, Search, Filter, Loader2, Trash2, Edit2, ClipboardList, ShoppingCart, X, Facebook, Instagram, Pencil, PauseCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrderForm } from '@/features/orders/OrderForm';
@@ -326,12 +326,40 @@ const OrdersPage = () => {
                         <td className="table-cell text-right">
                           <Tooltip>
                             <TooltipTrigger>
-                              <span className="text-success font-medium">RM {order.commissionAmount.toFixed(2)}</span>
-                              <span className="text-xs text-muted-foreground ml-1">({order.snapshotRate}%)</span>
+                              {order.commissionPaused ? (
+                                isAdmin ? (
+                                  // Admin sees actual value with pause indicator
+                                  <span className="flex items-center gap-1 justify-end">
+                                    <PauseCircle className="w-3.5 h-3.5 text-amber-500" />
+                                    <span className="text-amber-600 dark:text-amber-400 font-medium">RM {order.commissionAmount.toFixed(2)}</span>
+                                    <span className="text-xs text-muted-foreground">({order.snapshotRate}%)</span>
+                                  </span>
+                                ) : (
+                                  // Sales sees RM 0.00
+                                  <span className="text-muted-foreground font-medium flex items-center gap-1 justify-end">
+                                    <PauseCircle className="w-3.5 h-3.5 text-amber-500" />
+                                    RM 0.00
+                                  </span>
+                                )
+                              ) : (
+                                <>
+                                  <span className="text-success font-medium">RM {order.commissionAmount.toFixed(2)}</span>
+                                  <span className="text-xs text-muted-foreground ml-1">({order.snapshotRate}%)</span>
+                                </>
+                              )}
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Snapshot Rate: {order.snapshotRate}%</p>
-                              <p className="text-xs text-muted-foreground">Rate locked at order creation</p>
+                              {order.commissionPaused ? (
+                                <>
+                                  <p className="text-amber-500">Commission Paused</p>
+                                  <p className="text-xs text-muted-foreground">This order's commission is paused ({order.snapshotRate}%)</p>
+                                </>
+                              ) : (
+                                <>
+                                  <p>Snapshot Rate: {order.snapshotRate}%</p>
+                                  <p className="text-xs text-muted-foreground">Rate locked at order creation</p>
+                                </>
+                              )}
                             </TooltipContent>
                           </Tooltip>
                         </td>

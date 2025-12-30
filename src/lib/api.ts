@@ -44,6 +44,7 @@ export interface User {
     username: string;
     role: 'admin' | 'sales';
     commissionRate: number;
+    commissionPausedDate?: string | null; // null = active, ISO date = paused since that date
     avatar?: string;
     status: 'active' | 'inactive';
     createdAt: string;
@@ -81,6 +82,7 @@ export interface Order {
     orderTotal: number;
     snapshotRate: number;
     commissionAmount: number;
+    commissionPaused: boolean; // true if commission was paused at order creation time
     createdAt: string;
     updatedAt: string;
 }
@@ -244,6 +246,7 @@ export interface UpdateUserData {
     password?: string;
     role?: 'admin' | 'sales';
     commissionRate?: number;
+    commissionPausedDate?: string | null; // ISO date string or null to unpause
     status?: 'active' | 'inactive';
 }
 

@@ -20,6 +20,7 @@ interface UpdateUserData {
     password?: string;
     role?: Role;
     commissionRate?: number;
+    commissionPausedDate?: string | null; // ISO date string or null to unpause
     status?: UserStatus;
 }
 
@@ -39,6 +40,7 @@ export const userService = {
                 username: true,
                 role: true,
                 commissionRate: true,
+                commissionPausedDate: true,
                 status: true,
                 createdAt: true,
                 updatedAt: true,
@@ -61,6 +63,7 @@ export const userService = {
                 username: true,
                 role: true,
                 commissionRate: true,
+                commissionPausedDate: true,
                 status: true,
                 createdAt: true,
                 updatedAt: true,
@@ -119,6 +122,7 @@ export const userService = {
                 username: true,
                 role: true,
                 commissionRate: true,
+                commissionPausedDate: true,
                 status: true,
                 createdAt: true,
                 updatedAt: true,
@@ -181,6 +185,25 @@ export const userService = {
             updateData.passwordHash = await authService.hashPassword(data.password);
         }
 
+        // Handle commission pause date
+        if (data.commissionPausedDate !== undefined) {
+            if (data.commissionPausedDate === null) {
+                // Unpause: clear the date
+                updateData.commissionPausedDate = null;
+            } else {
+                // Pause: validate date is not in the past
+                const pauseDate = new Date(data.commissionPausedDate);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                if (pauseDate < today) {
+                    throw new ValidationError('Commission pause date cannot be in the past');
+                }
+
+                updateData.commissionPausedDate = pauseDate;
+            }
+        }
+
         // Update user
         const user = await prisma.user.update({
             where: { id },
@@ -191,11 +214,36 @@ export const userService = {
                 username: true,
                 role: true,
                 commissionRate: true,
+                commissionPausedDate: true,
                 status: true,
                 createdAt: true,
                 updatedAt: true,
             },
         });
+
+        // If we just unpaused the user, also unpause all their orders
+        if (data.commissionPausedDate === null) {
+            // Get all campaigns for this user
+            const campaigns = await prisma.campaign.findMany({
+                where: { salesPersonId: id },
+                select: { id: true },
+            });
+
+            const campaignIds = campaigns.map(c => c.id);
+
+            // Update all paused orders for these campaigns
+            if (campaignIds.length > 0) {
+                await prisma.order.updateMany({
+                    where: {
+                        campaignId: { in: campaignIds },
+                        commissionPaused: true,
+                    },
+                    data: {
+                        commissionPaused: false,
+                    },
+                });
+            }
+        }
 
         return user;
     },

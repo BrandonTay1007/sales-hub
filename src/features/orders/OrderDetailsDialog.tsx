@@ -1,4 +1,4 @@
-import { Facebook, Instagram } from 'lucide-react';
+import { Facebook, Instagram, PauseCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { type Order, type Campaign, type User } from '@/lib/api';
@@ -138,7 +138,20 @@ export const OrderDetailsDialog = ({
                         </div>
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Commission</span>
-                            <span className="text-success font-bold">RM {order.commissionAmount.toFixed(2)}</span>
+                            {order.commissionPaused ? (
+                                <Tooltip>
+                                    <TooltipTrigger className="flex items-center gap-1">
+                                        <PauseCircle className="w-4 h-4 text-amber-500" />
+                                        <span className="text-muted-foreground font-bold">RM 0.00</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p className="text-amber-500">Commission Paused</p>
+                                        <p className="text-xs text-muted-foreground">Original: RM {order.commissionAmount.toFixed(2)}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            ) : (
+                                <span className="text-success font-bold">RM {order.commissionAmount.toFixed(2)}</span>
+                            )}
                         </div>
                     </div>
                 </div>
