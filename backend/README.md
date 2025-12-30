@@ -15,7 +15,7 @@ REST API backend for the Pebble Sales Hub sales commission tracking system.
 ## Prerequisites
 
 - Node.js 18+
-- MongoDB (Atlas, Docker, or local installation)
+- MongoDB (Atlas recommended, or local installation)
 
 ## Quick Start
 
@@ -28,21 +28,14 @@ npm install
 
 ### 2. Set up MongoDB
 
-Choose one option:
-
-**Option A: MongoDB Atlas (Cloud)**
+**Option A: MongoDB Atlas (Recommended)**
 1. Create account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
 2. Create cluster, database user, and add your IP
-3. Get connection string
+3. Copy connection string to `.env` file
 
-**Option B: Docker**
-```bash
-docker run -d --name mongodb -p 27017:27017 mongo:latest --replSet rs0
-docker exec mongodb mongosh --eval "rs.initiate()"
-```
-
-**Option C: Local MongoDB**
-- Install MongoDB and start as replica set
+**Option B: Local MongoDB**
+- Install [MongoDB Community Edition](https://www.mongodb.com/try/download/community)
+- Start as replica set (required for Prisma)
 
 ### 3. Generate Prisma Client and Push Schema to Database
 

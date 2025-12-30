@@ -20,9 +20,6 @@ const app: Express = express();
 // Middleware
 const allowedOrigins = [
     process.env.FRONTEND_URL || 'http://localhost:8080',
-    'http://localhost:8081',
-    'http://127.0.0.1:8080',
-    'http://127.0.0.1:8081',
 ];
 
 app.use(cors({
@@ -30,8 +27,9 @@ app.use(cors({
         // Allow requests with no origin (like mobile apps or curl requests)
         if (!origin) return callback(null, true);
 
-        // Check if origin is allowed
+        // Check if origin is allowed 
         const isAllowed = allowedOrigins.includes(origin) ||
+            // Added to test with 2 ports
             origin.startsWith('http://localhost:') ||
             origin.startsWith('http://127.0.0.1:');
 
