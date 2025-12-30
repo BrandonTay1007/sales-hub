@@ -74,10 +74,11 @@ A web-based platform that automates sales tracking, locks commission rates at th
 ### Prerequisites
 
 - **Node.js** 18+ and npm
-- **Docker** and Docker Compose (recommended for MongoDB)
+- **MongoDB** - Choose one of the following options:
+  - [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) (cloud, free tier available)
+  - [Docker](https://www.docker.com/) with MongoDB image
+  - [Local MongoDB installation](https://www.mongodb.com/try/download/community)
 - **Git** for version control
-
-> **Note**: While you can install MongoDB locally, using Docker is recommended for easier setup and consistency across environments.
 
 ### Installation
 
@@ -87,31 +88,27 @@ A web-based platform that automates sales tracking, locks commission rates at th
    cd sales-hub
    ```
 
-2. **Start MongoDB with Docker**
+2. **Set up MongoDB**
 
-   **Option A: Automated Setup (Recommended)**
+   Choose one of these options:
+
+   **Option A: MongoDB Atlas (Cloud)**
+   1. Create a free account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
+   2. Create a cluster and database user
+   3. Add your IP to the access list
+   4. Get connection string: `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/pebble-sales-hub`
+
+   **Option B: Docker**
    ```bash
-   # Windows (PowerShell)
-   .\setup-mongodb.ps1
-   
-   # Mac/Linux
-   chmod +x setup-mongodb.sh
-   ./setup-mongodb.sh
+   docker run -d --name mongodb -p 27017:27017 mongo:latest --replSet rs0
+   docker exec mongodb mongosh --eval "rs.initiate()"
    ```
-   
-   The script automatically:
-   - Starts MongoDB container
-   - Initializes replica set (if needed)
-   - Checks if already initialized (safe to run multiple times)
-   
-   **Option B: Manual Setup**
-   ```bash
-   # Start container
-   docker-compose up -d
-   
-   # Initialize replica set (only needed once)
-   docker exec -it pebble-mongodb mongosh --eval "rs.initiate()"
-   ```
+   Connection string: `mongodb://localhost:27017/pebble-sales-hub`
+
+   **Option C: Local MongoDB**
+   - Install MongoDB Community Edition
+   - Start as a replica set (required for Prisma transactions)
+   - Connection string: `mongodb://localhost:27017/pebble-sales-hub`
 
 3. **Install frontend dependencies**
    ```bash
@@ -126,19 +123,16 @@ A web-based platform that automates sales tracking, locks commission rates at th
 
 5. **Set up environment variables**
 
-   Create `.env` files in both root and `backend/` directories:
-
-   **Root `.env`:**
-   ```env
-   VITE_API_URL=http://localhost:3000/api
-   ```
+   Create a `.env` file in the `backend/` directory:
 
    **Backend `.env`:**
    ```env
-   DATABASE_URL="mongodb://localhost:27017/pebble-sales-hub"
+   DATABASE_URL="<your-mongodb-connection-string>"
    JWT_SECRET="your-secret-key-here"
    PORT=3000
    ```
+
+   > **Note:** Use the connection string from your MongoDB setup in step 2.
 
 6. **Initialize the database**
    ```bash
@@ -215,17 +209,13 @@ npx prisma db push --force-reset
 npm run seed
 ```
 
-### MongoDB Shell Access
+### MongoDB Shell Access (Atlas)
+
+You can access your MongoDB Atlas database using MongoDB Compass (GUI) or the mongosh CLI:
 
 ```bash
-# Access MongoDB shell
-docker exec -it pebble-mongodb mongosh
-
-# View databases
-show dbs
-
-# Use pebble-sales-hub database
-use pebble-sales-hub
+# Install mongosh if needed: https://www.mongodb.com/try/download/shell
+mongosh "mongodb+srv://<cluster>.mongodb.net/pebble-sales-hub" --username <username>
 
 # View collections
 show collections
@@ -235,6 +225,8 @@ db.User.find()
 db.Campaign.find()
 db.Order.find()
 ```
+
+Alternatively, use [MongoDB Compass](https://www.mongodb.com/products/compass) for a visual interface.
 
 ## Usage
 

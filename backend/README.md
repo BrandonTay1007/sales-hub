@@ -15,7 +15,7 @@ REST API backend for the Pebble Sales Hub sales commission tracking system.
 ## Prerequisites
 
 - Node.js 18+
-- Docker Desktop (for MongoDB)
+- MongoDB (Atlas, Docker, or local installation)
 
 ## Quick Start
 
@@ -26,31 +26,38 @@ cd backend
 npm install
 ```
 
-### 2. Start MongoDB (Docker)
+### 2. Set up MongoDB
 
+Choose one option:
+
+**Option A: MongoDB Atlas (Cloud)**
+1. Create account at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
+2. Create cluster, database user, and add your IP
+3. Get connection string
+
+**Option B: Docker**
 ```bash
-docker-compose up -d
+docker run -d --name mongodb -p 27017:27017 mongo:latest --replSet rs0
+docker exec mongodb mongosh --eval "rs.initiate()"
 ```
 
-### 3. Generate Prisma Client
+**Option C: Local MongoDB**
+- Install MongoDB and start as replica set
+
+### 3. Generate Prisma Client and Push Schema to Database
 
 ```bash
 npm run prisma:generate
-```
-
-### 4. Push Schema to Database
-
-```bash
 npm run prisma:push
 ```
 
-### 5. Seed Database
+### 4. Seed Database
 
 ```bash
 npm run seed
 ```
 
-### 6. Start Development Server
+### 5. Start Development Server
 
 ```bash
 npm run dev
@@ -155,15 +162,19 @@ describe('GET /api/my-endpoint', () => {
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and configure:
+Create a `.env` file in the `backend/` directory:
 
 ```
 PORT=3000
-DATABASE_URL=mongodb://localhost:27017/pebble-sales-hub
+DATABASE_URL=<your-mongodb-connection-string>
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=7d
 FRONTEND_URL=http://localhost:8080
 ```
+
+**Example connection strings:**
+- Atlas: `mongodb+srv://user:pass@cluster.mongodb.net/pebble-sales-hub`
+- Docker/Local: `mongodb://localhost:27017/pebble-sales-hub`
 
 ## API Endpoints
 
@@ -252,7 +263,7 @@ backend/
 ├── tests/
 │   ├── unit/            # Unit tests
 │   └── integration/     # API tests
-└── docker-compose.yml   # MongoDB
+└── .env                 # Environment variables (not in git)
 ```
 
 ## Related Documentation
