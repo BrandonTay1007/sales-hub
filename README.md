@@ -144,11 +144,11 @@ A web-based platform that automates sales tracking, locks commission rates at th
    # Push schema to MongoDB
    npx prisma db push
    
-   # Seed with test data
+   # Seed with test data (Optional)
    npm run seed
    ```
    
-   > **Important**: `npx prisma generate` must be run after `npm install` on any new machine. This generates the Prisma Client based on your schema.
+   > **Important**: `npx prisma generate` must be run after `npm install` on any new machine.
 
 ### Running the Application
 
